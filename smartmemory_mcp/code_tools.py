@@ -335,7 +335,9 @@ def code_index(
         "relations": [r.to_dict() for r in all_relations],
     }
 
-    result = _request("POST", "/memory/code/index", workspace_id=workspace_id, json=payload)
+    # Large repos (1000+ entities) need extended timeout for server-side graph writes
+    timeout = max(60, len(all_entities) // 50)
+    result = _request("POST", "/memory/code/index", workspace_id=workspace_id, timeout=timeout, json=payload)
     err = _fmt_error(result)
     if err:
         return err

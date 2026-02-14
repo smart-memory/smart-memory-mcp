@@ -31,9 +31,9 @@ def _headers(workspace_id: Optional[str] = None) -> dict:
     }
 
 
-def _request(method: str, path: str, workspace_id: Optional[str] = None, **kwargs):
+def _request(method: str, path: str, workspace_id: Optional[str] = None, timeout: int = 30, **kwargs):
     try:
-        r = httpx.request(method, f"{API_URL}{path}", headers=_headers(workspace_id), timeout=30, **kwargs)
+        r = httpx.request(method, f"{API_URL}{path}", headers=_headers(workspace_id), timeout=timeout, **kwargs)
         r.raise_for_status()
         return r.json() if r.status_code != 204 else None
     except httpx.ConnectError:
