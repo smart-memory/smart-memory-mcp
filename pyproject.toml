@@ -14,4 +14,4 @@ dependencies = [
 ]
 
 [project.scripts]
-smartmemory-mcp = "server:main"
+smartmemory-mcp = "smartmemory_mcp.server:main"

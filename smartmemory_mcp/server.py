@@ -235,7 +235,7 @@ def memory_health() -> str:
 # Code indexing tools (parser runs locally, results POST to API)
 # ---------------------------------------------------------------------------
 
-import code_tools  # noqa: F401 — registers code_index, code_search, code_dependencies on mcp
+from smartmemory_mcp import code_tools  # noqa: F401 — registers code_index, code_search, code_dependencies on mcp
 
 
 # ---------------------------------------------------------------------------

@@ -280,7 +280,7 @@ def collect_python_files(directory, exclude_dirs=None):
 # MCP tools
 # ---------------------------------------------------------------------------
 
-from server import mcp, _request, _fmt_error
+from smartmemory_mcp.server import mcp, _request, _fmt_error
 
 
 @mcp.tool()
