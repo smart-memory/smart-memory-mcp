@@ -250,9 +250,9 @@ def main():
         for i, arg in enumerate(sys.argv):
             if arg == "--port" and i + 1 < len(sys.argv):
                 port = int(sys.argv[i + 1])
-        mcp.run(transport="http", host="0.0.0.0", port=port)
+        mcp.run(transport="http", host="0.0.0.0", port=port, show_banner=False)
     else:
-        mcp.run()
+        mcp.run(show_banner=False)
 
 
 if __name__ == "__main__":
