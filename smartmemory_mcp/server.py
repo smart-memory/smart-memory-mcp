@@ -4,9 +4,9 @@ SmartMemory MCP Server — thin HTTP client to remote SmartMemory API.
 No local infrastructure required. All operations go through the REST API.
 
 Env vars:
-    SMARTMEMORY_API_URL      — API base URL (default: https://api.smartmemory.ai)
-    SMARTMEMORY_API_KEY      — API key (sk_...) for authentication
-    SMARTMEMORY_WORKSPACE_ID — Default workspace (default: "default")
+    SMARTMEMORY_API_URL   — API base URL (default: https://api.smartmemory.ai)
+    SMARTMEMORY_API_KEY   — API key (sk_...) for authentication
+    SMARTMEMORY_TEAM_ID   — Default team (default: "default")
 """
 
 import os
@@ -18,7 +18,7 @@ from fastmcp import FastMCP
 
 API_URL = os.environ.get("SMARTMEMORY_API_URL", "https://api.smartmemory.ai")
 API_KEY = os.environ.get("SMARTMEMORY_API_KEY", "")
-DEFAULT_WORKSPACE = os.environ.get("SMARTMEMORY_WORKSPACE_ID", "default")
+DEFAULT_TEAM = os.environ.get("SMARTMEMORY_TEAM_ID", os.environ.get("SMARTMEMORY_WORKSPACE_ID", "default"))
 
 mcp = FastMCP("smartmemory-memory")
 
@@ -27,7 +27,7 @@ def _headers(workspace_id: Optional[str] = None) -> dict:
     return {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json",
-        "X-Workspace-Id": workspace_id or DEFAULT_WORKSPACE,
+        "X-Team-Id": workspace_id or DEFAULT_TEAM,
     }
 
 
