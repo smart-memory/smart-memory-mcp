@@ -226,7 +226,7 @@ def memory_health() -> str:
     try:
         r = httpx.get(f"{API_URL}/health", timeout=10)
         r.raise_for_status()
-        return f"SmartMemory API healthy. URL: {API_URL}, workspace: {DEFAULT_WORKSPACE}"
+        return f"SmartMemory API healthy. URL: {API_URL}, team: {DEFAULT_TEAM}"
     except Exception as e:
         return f"SmartMemory API unreachable at {API_URL}: {e}"
 
