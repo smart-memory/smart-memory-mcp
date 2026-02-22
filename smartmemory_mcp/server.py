@@ -26,14 +26,47 @@ API_URL = os.environ.get("SMARTMEMORY_API_URL", "https://api.smartmemory.ai")
 _session: dict = {
     "access_token": os.environ.get("SMARTMEMORY_API_KEY", ""),
     "refresh_token": "",
-    "team_id": os.environ.get("SMARTMEMORY_TEAM_ID", os.environ.get("SMARTMEMORY_WORKSPACE_ID", "default")),
+    # SMARTMEMORY_TEAM_ID is an explicit override; otherwise auto-discovered from /auth/me.
+    "team_id": os.environ.get("SMARTMEMORY_TEAM_ID", os.environ.get("SMARTMEMORY_WORKSPACE_ID", "")),
     "user_email": "",
+    "_bootstrapped": False,
 }
 
 mcp = FastMCP("smartmemory-memory")
 
 
+def _bootstrap_from_api_key() -> None:
+    """On first use, call /auth/me with the API key to discover user identity and default_team_id.
+
+    This ensures the session team_id always matches the authenticated user's actual
+    default team — not a potentially-stale SMARTMEMORY_TEAM_ID env var.
+    """
+    if _session["_bootstrapped"] or not _session["access_token"]:
+        return
+    _session["_bootstrapped"] = True
+    try:
+        r = httpx.get(
+            f"{API_URL}/auth/me",
+            headers={
+                "Authorization": f"Bearer {_session['access_token']}",
+                "Content-Type": "application/json",
+            },
+            timeout=10,
+        )
+        if r.status_code == 200:
+            user = r.json()
+            _session["user_email"] = user.get("email", "")
+            # Only override team_id if not explicitly set via env var.
+            if not os.environ.get("SMARTMEMORY_TEAM_ID") and not os.environ.get("SMARTMEMORY_WORKSPACE_ID"):
+                discovered = user.get("default_team_id") or ""
+                if discovered:
+                    _session["team_id"] = discovered
+    except Exception:
+        pass  # Silently skip — bootstrap is best-effort; tool calls will surface real errors.
+
+
 def _headers(workspace_id: Optional[str] = None) -> dict:
+    _bootstrap_from_api_key()
     return {
         "Authorization": f"Bearer {_session['access_token']}",
         "Content-Type": "application/json",
@@ -68,45 +101,46 @@ def _fmt_error(result) -> Optional[str]:
 
 @mcp.tool()
 def login(
-    email: Optional[str] = None,
-    password: Optional[str] = None,
+    api_key: Optional[str] = None,
     team_id: Optional[str] = None,
 ) -> str:
-    """Log in to SmartMemory and store tokens for this session.
+    """Set API key credentials for this session and discover user identity from /auth/me.
 
-    After login, all other tools use the new credentials automatically.
-    No MCP reload needed to switch users — just call login again.
+    SmartMemory uses Clerk-based SSO — email/password login is not available via MCP.
+    Use an API key (sk_...) from your SmartMemory account settings instead.
+
+    After calling login, all other tools use the new credentials automatically.
+    No MCP reload needed — just call login again to switch API keys.
 
     Args:
-        email: User email address (default: SMARTMEMORY_DEV_EMAIL env var)
-        password: User password (default: SMARTMEMORY_DEV_PASSWORD env var)
-        team_id: Team/workspace to use (default: user's default team)
+        api_key: SmartMemory API key (sk_...) — defaults to SMARTMEMORY_API_KEY env var
+        team_id: Team to use — if omitted, auto-discovered from the API key's user profile
     """
-    email = email or os.environ.get("SMARTMEMORY_DEV_EMAIL", "")
-    password = password or os.environ.get("SMARTMEMORY_DEV_PASSWORD", "")
-    if not email or not password:
-        return "No credentials. Pass email/password or set SMARTMEMORY_DEV_EMAIL/SMARTMEMORY_DEV_PASSWORD env vars."
+    key = api_key or os.environ.get("SMARTMEMORY_API_KEY", "")
+    if not key:
+        return "No API key. Pass api_key or set SMARTMEMORY_API_KEY env var."
+
+    _session["access_token"] = key
+    _session["refresh_token"] = ""
+    _session["user_email"] = ""
+    _session["_bootstrapped"] = False  # Force re-bootstrap with new key
+
+    # Discover user identity from /auth/me
     try:
-        r = httpx.post(
-            f"{API_URL}/auth/login",
-            json={"email": email, "password": password},
-            headers={"Content-Type": "application/json"},
+        r = httpx.get(
+            f"{API_URL}/auth/me",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             timeout=15,
         )
         r.raise_for_status()
-        data = r.json()
+        user = r.json()
+        _session["user_email"] = user.get("email", "")
+        _session["team_id"] = team_id or user.get("default_team_id") or _session["team_id"]
+        _session["_bootstrapped"] = True
     except httpx.HTTPStatusError as e:
-        return f"Login failed ({e.response.status_code}): {e.response.text}"
+        return f"API key validation failed ({e.response.status_code}): {e.response.text}"
     except Exception as e:
         return f"Login failed: {e}"
-
-    tokens = data.get("tokens", {})
-    user = data.get("user", {})
-
-    _session["access_token"] = tokens.get("access_token", "")
-    _session["refresh_token"] = tokens.get("refresh_token", "")
-    _session["user_email"] = user.get("email", email)
-    _session["team_id"] = team_id or user.get("default_team_id") or _session["team_id"]
 
     return f"Logged in as {_session['user_email']}, team: {_session['team_id']}"
 
@@ -327,7 +361,8 @@ def memory_ingest(
         workspace_id: Workspace (default: current session team)
     """
     body = {"content": content, "context": {"memory_type": memory_type}}
-    result = _request("POST", "/memory/ingest", workspace_id=workspace_id, json=body)
+    # Full pipeline (LLM extraction + grounding) can take 60-120s — use a long timeout.
+    result = _request("POST", "/memory/ingest", workspace_id=workspace_id, timeout=120, json=body)
     err = _fmt_error(result)
     if err:
         return err
