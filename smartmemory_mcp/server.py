@@ -367,9 +367,11 @@ def memory_ingest(
     if err:
         return err
     item_id = result.get("item_id", "unknown")
-    entities = result.get("entities_extracted", 0)
-    relations = result.get("relations_extracted", 0)
-    return f"Ingested. ID: {item_id}, entities: {entities}, relations: {relations}"
+    unresolved = len(result.get("unresolved_entities", []))
+    violations = len(result.get("constraint_violations", []))
+    extra = f", unresolved: {unresolved}" if unresolved else ""
+    extra += f", violations: {violations}" if violations else ""
+    return f"Ingested. ID: {item_id}{extra}"
 
 
 @mcp.tool()
