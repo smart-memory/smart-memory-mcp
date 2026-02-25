@@ -70,7 +70,7 @@ def _headers(workspace_id: Optional[str] = None) -> dict:
     return {
         "Authorization": f"Bearer {_session['access_token']}",
         "Content-Type": "application/json",
-        "X-Team-Id": workspace_id or _session["team_id"],
+        "X-Workspace-Id": workspace_id or _session["team_id"],
     }
 
 
