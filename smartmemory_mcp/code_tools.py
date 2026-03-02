@@ -3,7 +3,7 @@
 Parses Python codebases locally using stdlib ast module, then POSTs
 results to SmartMemory API for remote graph storage and search.
 
-Parser adapted from smart-memory/smartmemory/code/parser.py
+Parser adapted from smart-memory-core/smartmemory/code/parser.py
 """
 
 import ast
