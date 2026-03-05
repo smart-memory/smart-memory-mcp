@@ -38,3 +38,8 @@ class TestServerDecompose:
     def test_decompose_true_in_body(self):
         _, body = self._call_search(query="auth", decompose=True)
         assert body["decompose"] is True
+
+    def test_enable_hybrid_default_true(self):
+        """TECHDEBT-SEARCH-1: standalone MCP sends enable_hybrid=True by default."""
+        _, body = self._call_search(query="auth")
+        assert body["enable_hybrid"] is True
