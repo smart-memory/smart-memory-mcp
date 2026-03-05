@@ -239,6 +239,7 @@ def memory_search(
     query: str,
     top_k: int = 5,
     memory_type: Optional[str] = None,
+    decompose: bool = False,
     workspace_id: Optional[str] = None,
 ) -> str:
     """Search memories by semantic similarity.
@@ -247,11 +248,14 @@ def memory_search(
         query: Search query (matched by meaning, not just keywords)
         top_k: Number of results to return (default: 5)
         memory_type: Filter by type — semantic, episodic, procedural, etc. (optional)
+        decompose: Decompose compound queries into sub-queries for better multi-topic retrieval
         workspace_id: Workspace to search in (default: current session team)
     """
     body = {"query": query, "top_k": top_k, "enable_hybrid": True}
     if memory_type:
         body["memory_type"] = memory_type
+    if decompose:
+        body["decompose"] = True
     result = _request("POST", "/memory/search", workspace_id=workspace_id, json=body)
     err = _fmt_error(result)
     if err:
