@@ -251,18 +251,40 @@ def memory_search(
         decompose: Decompose compound queries into sub-queries for better multi-topic retrieval
         workspace_id: Workspace to search in (default: current session team)
     """
+    import time
+
     body = {"query": query, "top_k": top_k, "enable_hybrid": True}
     if memory_type:
         body["memory_type"] = memory_type
     if decompose:
         body["decompose"] = True
+
+    t0 = time.monotonic()
     result = _request("POST", "/memory/search", workspace_id=workspace_id, json=body)
+    latency_ms = (time.monotonic() - t0) * 1000
+
     err = _fmt_error(result)
     if err:
         return err
     if not result:
         return f"No results found for: {query}"
     items = result if isinstance(result, list) else [result]
+
+    # Eval logging (gated by EVAL_LOGGING env var)
+    try:
+        from smartmemory_mcp.eval_logger import log_interaction
+
+        log_interaction(
+            query=query,
+            top_k=top_k,
+            memory_type=memory_type,
+            decompose=decompose,
+            latency_ms=latency_ms,
+            raw_results=items,
+        )
+    except Exception:
+        pass  # Never let logging break search
+
     lines = [f"Found {len(items)} results for '{query}':\n"]
     for i, item in enumerate(items, 1):
         content = item.get("content", "")
