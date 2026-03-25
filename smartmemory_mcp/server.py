@@ -291,7 +291,11 @@ def memory_search(
         preview = content[:200] + "..." if len(content) > 200 else content
         score = item.get("score")
         score_str = f" (score: {score:.3f})" if isinstance(score, (int, float)) else ""
-        lines.append(f"{i}. [{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}")
+        # CORE-PROPS-1: Include confidence in result output
+        conf = item.get("confidence")
+        conf_str = f" [conf: {conf:.2f}]" if isinstance(conf, (int, float)) else ""
+        conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
+        lines.append(f"{i}. {conf_marker}[{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}{conf_str}")
         lines.append(f"   {preview}\n")
     return "\n".join(lines)
 
