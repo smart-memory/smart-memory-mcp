@@ -295,7 +295,10 @@ def memory_search(
         conf = item.get("confidence")
         conf_str = f" [conf: {conf:.2f}]" if isinstance(conf, (int, float)) else ""
         conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
-        lines.append(f"{i}. {conf_marker}[{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}{conf_str}")
+        # CORE-PROPS-1 Phase 2: stale marker
+        stale_marker = "⚠" if item.get("stale") else ""
+        stale_str = " [STALE]" if item.get("stale") else ""
+        lines.append(f"{i}. {stale_marker}{conf_marker}[{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}{conf_str}{stale_str}")
         lines.append(f"   {preview}\n")
     return "\n".join(lines)
 
