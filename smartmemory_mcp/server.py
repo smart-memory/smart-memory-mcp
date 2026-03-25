@@ -241,6 +241,7 @@ def memory_search(
     memory_type: Optional[str] = None,
     decompose: bool = False,
     workspace_id: Optional[str] = None,
+    include_reference: bool = False,
 ) -> str:
     """Search memories by semantic similarity.
 
@@ -250,10 +251,13 @@ def memory_search(
         memory_type: Filter by type — semantic, episodic, procedural, etc. (optional)
         decompose: Decompose compound queries into sub-queries for better multi-topic retrieval
         workspace_id: Workspace to search in (default: current session team)
+        include_reference: Include reference data (grounding, seed packs) in results (default: false)
     """
     import time
 
     body = {"query": query, "top_k": top_k, "enable_hybrid": True}
+    if include_reference:
+        body["include_reference"] = True
     if memory_type:
         body["memory_type"] = memory_type
     if decompose:
