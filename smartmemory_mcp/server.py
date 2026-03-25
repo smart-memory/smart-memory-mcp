@@ -298,7 +298,10 @@ def memory_search(
         # CORE-PROPS-1 Phase 2: stale marker
         stale_marker = "⚠" if item.get("stale") else ""
         stale_str = " [STALE]" if item.get("stale") else ""
-        lines.append(f"{i}. {stale_marker}{conf_marker}[{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}{conf_str}{stale_str}")
+        # CORE-PROPS-1 Phase 4: lineage indicator
+        derived = item.get("derived_from")
+        derived_str = f" [→{derived[:8]}]" if derived else ""
+        lines.append(f"{i}. {stale_marker}{conf_marker}[{item.get('item_id', '?')}] ({item.get('memory_type', '?')}){score_str}{conf_str}{stale_str}{derived_str}")
         lines.append(f"   {preview}\n")
     return "\n".join(lines)
 
