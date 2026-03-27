@@ -139,6 +139,8 @@ def register_free(mcp):
         backend = get_backend()
         result = backend.ingest(content, memory_type=memory_type)
         if isinstance(result, dict):
+            if "error" in result:
+                return f"Ingest failed: {result['error']}"
             item_id = result.get("item_id", "unknown")
         else:
             item_id = str(result)
@@ -226,6 +228,19 @@ def register_free(mcp):
         # Fallback: search working memory
         fetch_k = top_k * 5 if session_id else top_k
         results = backend.search(query, top_k=fetch_k, memory_type="working")
+
+        # Filter by session_id if provided
+        if session_id and results:
+            results = [
+                r for r in results
+                if _item_field(
+                    _item_field(r, "metadata", {}) or {}, "conversation_id", ""
+                ) == session_id
+                or _item_field(
+                    _item_field(r, "metadata", {}) or {}, "session_id", ""
+                ) == session_id
+            ]
+
         return _format_recall(query, results[:top_k], session_id=session_id)
 
     @mcp.tool()
@@ -337,7 +352,10 @@ def register_pro(mcp):
     def memory_stats() -> str:
         """Get memory count statistics grouped by type."""
         backend = get_backend()
-        result = backend.get_all_items_debug()
+        try:
+            result = backend.stats()
+        except NotImplementedError:
+            result = backend.get_all_items_debug()
 
         if isinstance(result, dict):
             total = result.get("total_items", 0)

@@ -202,11 +202,13 @@ class RemoteBackend:
         return result if isinstance(result, list) else []
 
     def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
-        """POST /memory/search with metadata filters."""
-        body: dict[str, Any] = {"query": "", "top_k": top_k, "filters": {metadata_key: metadata_value}}
-        result = self._request("POST", "/memory/search", json=body)
-        if isinstance(result, dict) and self._fmt_error(result):
-            return [result]
+        """GET /memory/by-metadata — exact metadata match."""
+        params = {"metadata_key": metadata_key, "metadata_value": metadata_value}
+        result = self._request("GET", "/memory/by-metadata", params=params)
+        if isinstance(result, dict):
+            if self._fmt_error(result):
+                return [result]
+            return [result]  # Single item returned by service
         return result if isinstance(result, list) else []
 
     def recall(self, cwd: str | None = None, top_k: int = 10, **kwargs: Any) -> str:
@@ -238,7 +240,12 @@ class RemoteBackend:
 
     def ingest(self, content: str, memory_type: str = "semantic", **kwargs: Any) -> dict[str, Any] | str:
         """POST /memory/ingest (full pipeline)."""
-        body: dict[str, Any] = {"content": content, "context": {"memory_type": memory_type}}
+        context: dict[str, Any] = {"memory_type": memory_type}
+        # Merge metadata as top-level context keys (service merges context into pipeline state)
+        metadata = kwargs.get("metadata")
+        if metadata and isinstance(metadata, dict):
+            context.update(metadata)
+        body: dict[str, Any] = {"content": content, "context": context}
         result = self._request("POST", "/memory/ingest", timeout=120, json=body)
         if err := self._fmt_error(result):
             return {"error": err}
@@ -265,10 +272,18 @@ class RemoteBackend:
             return {"healthy": False, "error": str(e), "api_url": self._api_url}
 
     def list_memories(self, **kwargs: Any) -> list[dict[str, Any]]:
-        """GET /memory/ — list all memories."""
-        result = self._request("GET", "/memory/")
-        if isinstance(result, dict) and self._fmt_error(result):
-            return []
+        """GET /memory/list — list all memories."""
+        params: dict[str, str] = {}
+        if "limit" in kwargs:
+            params["limit"] = str(kwargs["limit"])
+        if "offset" in kwargs:
+            params["offset"] = str(kwargs["offset"])
+        result = self._request("GET", "/memory/list", params=params or None)
+        if isinstance(result, dict):
+            if self._fmt_error(result):
+                return []
+            # Service returns paginated dict with "items" and "total"
+            return result.get("items", [])
         return result if isinstance(result, list) else []
 
     # --- MemoryBackend protocol: NOT available in remote mode --------------------

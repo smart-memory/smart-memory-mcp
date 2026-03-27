@@ -34,12 +34,19 @@ def _item_to_record(item: dict) -> dict:
 
 
 def _import_record(backend, record: dict) -> None:
-    """Import a single record into backend."""
+    """Import a single record into backend, preserving metadata, tags, and origin."""
     content = record.get("content", "")
     if not content:
         raise ValueError("Empty content")
     memory_type = record.get("memory_type", "semantic")
-    backend.ingest(content, memory_type=memory_type)
+    metadata = record.get("metadata", {}) or {}
+    tags = record.get("tags", [])
+    origin = record.get("origin", "")
+    if tags:
+        metadata["tags"] = tags
+    if origin:
+        metadata["origin"] = origin
+    backend.ingest(content, memory_type=memory_type, metadata=metadata)
 
 
 def register(mcp):
@@ -102,6 +109,7 @@ def register(mcp):
             return f"Invalid target: {target}. Must be 'local' or 'remote'."
 
         from smartmemory_mcp.backends.dispatch import reset_backend
+        from smartmemory_mcp.tools.common import reset_backend as reset_common_backend
 
         # Step 1: Export from current backend
         backend = get_backend()
@@ -132,6 +140,7 @@ def register(mcp):
         cfg.mode = target
         save_config(cfg)
         reset_backend()
+        reset_common_backend()
 
         # Step 3: Import into new backend
         try:
@@ -156,6 +165,7 @@ def register(mcp):
                 cfg.mode = original_mode
                 save_config(cfg)
                 reset_backend()
+                reset_common_backend()
                 return (
                     f"Migration failed: all {fail_count} items failed. "
                     f"Config reverted to '{original_mode}'. Temp file: {tmp_path}"
@@ -171,6 +181,7 @@ def register(mcp):
             cfg.mode = original_mode
             save_config(cfg)
             reset_backend()
+            reset_common_backend()
             return (
                 f"Migration failed: {e}\n"
                 f"Config reverted to '{original_mode}'. Temp file: {tmp_path}"

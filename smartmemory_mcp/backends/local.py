@@ -69,6 +69,9 @@ class LocalBackend:
     def ingest(self, content: str, memory_type: str = "episodic", **kwargs: Any) -> str:
         """Full pipeline ingestion."""
         from smartmemory_app.storage import ingest
+        # storage.ingest() uses 'properties' not 'metadata'
+        if "metadata" in kwargs:
+            kwargs["properties"] = kwargs.pop("metadata")
         return ingest(content, memory_type, **kwargs)
 
     def recall(self, cwd: str | None = None, top_k: int = 10, **kwargs: Any) -> str:

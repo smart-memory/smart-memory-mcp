@@ -40,10 +40,11 @@ def resolve_backend() -> "MemoryBackend":
         if cfg.mode == "remote":
             log.info("Backend dispatch: remote mode (from config)")
             from smartmemory_mcp.backends.remote import RemoteBackend
+            from smartmemory_mcp.tier import get_api_key
 
             _backend = RemoteBackend(
                 api_url=cfg.api_url,
-                api_key=None,  # RemoteBackend reads env var / config internally
+                api_key=get_api_key(),  # Reads env var → keyring → file
                 team_id=cfg.team_id,
             )
             return _backend
