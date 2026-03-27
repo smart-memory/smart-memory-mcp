@@ -26,8 +26,11 @@ def register(mcp):
         from smartmemory.reasoning.challenger import AssertionChallenger
 
         backend = get_backend()
+        # Pass raw SmartMemory instance to challenger — it expects MemoryItem objects,
+        # not normalized MemoryResult dicts. Falls back to backend if _mem unavailable.
+        sm = getattr(backend, "_mem", backend)
         challenger = AssertionChallenger(
-            backend,
+            sm,
             use_llm=use_llm,
             use_graph=True,
             use_embedding=True,
@@ -47,7 +50,7 @@ def register(mcp):
             parts.append(f"\nConflicts ({len(result.conflicts)}):")
             for c in result.conflicts:
                 parts.append(
-                    f"  - [{c.existing_item.item_id}] {c.conflict_type.value} "
+                    f"  - [{c.existing_item.get('item_id', '?') if isinstance(c.existing_item, dict) else getattr(c.existing_item, 'item_id', '?')}] {c.conflict_type.value} "
                     f"(conf={c.confidence:.2f}): {c.explanation[:100]}"
                 )
 
@@ -70,13 +73,15 @@ def register(mcp):
         )
 
         backend = get_backend()
-        existing_item = backend.get(existing_item_id)
+        # Use raw SmartMemory instance — challenger expects MemoryItem objects
+        sm = getattr(backend, "_mem", backend)
+        existing_item = sm.get(existing_item_id)
         if not existing_item:
             return f"Memory item not found: {existing_item_id}"
 
         conflict = Conflict(
             existing_item=existing_item,
-            existing_fact=existing_item.content,
+            existing_fact=existing_item.content if hasattr(existing_item, "content") else existing_item["content"],
             new_fact=new_fact,
             conflict_type=ConflictType.DIRECT_CONTRADICTION,
             confidence=0.8,
@@ -84,7 +89,7 @@ def register(mcp):
             suggested_resolution=ResolutionStrategy.DEFER,
         )
 
-        challenger = AssertionChallenger(backend, use_llm=use_llm)
+        challenger = AssertionChallenger(sm, use_llm=use_llm)
         result = challenger.auto_resolve(
             conflict, use_wikipedia=use_wikipedia, use_llm=use_llm
         )
