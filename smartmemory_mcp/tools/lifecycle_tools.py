@@ -22,6 +22,7 @@ def register(mcp) -> None:
     @mcp.tool()
     @graceful
     def memory_auto(
+        session_id: str = "",
         enabled: bool = True,
         recall_strategy: str = "topic_change",
         orient_budget: int = 1500,
@@ -62,8 +63,10 @@ def register(mcp) -> None:
         }
 
         # Write overrides to session state file so hook-driven CLI calls see them.
-        # Session ID comes from the most recent session state, or we create a default.
-        _write_session_overrides(overrides)
+        if not session_id:
+            log.warning("memory_auto called without session_id — overrides will not persist")
+        else:
+            _write_session_overrides(session_id, overrides)
 
         status = "enabled" if enabled else "disabled"
         parts = [
@@ -83,21 +86,24 @@ def register(mcp) -> None:
         return " ".join(parts)
 
 
-def _write_session_overrides(overrides: dict) -> None:
-    """Write config overrides to the most recent session state file."""
+def _write_session_overrides(session_id: str, overrides: dict) -> None:
+    """Write config overrides to a specific session state file."""
+    # Sanitize session_id
+    safe_id = "".join(c for c in session_id if c.isalnum() or c in "-_")
+    if not safe_id:
+        return
+
     data_dir = os.environ.get("SMARTMEMORY_DATA_DIR", str(Path.home() / ".smartmemory"))
     sessions_dir = Path(data_dir) / "sessions"
-    if not sessions_dir.exists():
-        return
+    sessions_dir.mkdir(parents=True, exist_ok=True)
 
-    # Find most recent session file
-    session_files = sorted(sessions_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-    if not session_files:
-        return
-
+    path = sessions_dir / f"{safe_id}.json"
     try:
-        path = session_files[0]
-        data = json.loads(path.read_text())
+        # Read existing state or create new
+        if path.exists():
+            data = json.loads(path.read_text())
+        else:
+            data = {"session_id": session_id}
         data["config_overrides"] = overrides
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data))
