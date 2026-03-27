@@ -101,6 +101,7 @@ FREE_TOOLS = sorted([
     "memory_export",
     "memory_import",
     "memory_migrate",
+    "memory_auto",  # DIST-AGENT-HOOKS-1
 ])
 
 
@@ -109,14 +110,14 @@ class TestToolRegistration:
         """FREE tier registers exactly 10 tools."""
         env = _clean_env()
         data = _run_snippet(env)
-        assert data["count"] == 10, f"Expected 10 FREE tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 11, f"Expected 11 FREE tools, got {data['count']}: {data['names']}"
         assert data["names"] == FREE_TOOLS
 
     def test_pro_tier_tool_count(self):
         """PRO tier registers exactly 47 tools."""
         env = _clean_env(SMARTMEMORY_API_KEY="sk_test_key_123")
         data = _run_snippet(env)
-        assert data["count"] == 47, f"Expected 47 PRO tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 48, f"Expected 48 PRO tools, got {data['count']}: {data['names']}"
         # Verify FREE tools are a subset of PRO tools
         for tool in FREE_TOOLS:
             assert tool in data["names"], f"FREE tool {tool!r} missing from PRO tier"
@@ -125,7 +126,7 @@ class TestToolRegistration:
         """PRO_PLUS tier registers exactly 78 tools."""
         env = _clean_env(SMARTMEMORY_API_KEY="sk_test_key_123", SMARTMEMORY_MCP_FULL_TOOLS="true")
         data = _run_snippet(env)
-        assert data["count"] == 78, f"Expected 78 PRO_PLUS tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 79, f"Expected 79 PRO_PLUS tools, got {data['count']}: {data['names']}"
         # Verify FREE tools are a subset of PRO_PLUS tools
         for tool in FREE_TOOLS:
             assert tool in data["names"], f"FREE tool {tool!r} missing from PRO_PLUS tier"

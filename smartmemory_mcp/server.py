@@ -104,10 +104,11 @@ def _register_tools():
     logger.info("SmartMemory MCP starting with tier: %s", tier.name)
 
     # FREE tier (always registered)
-    from smartmemory_mcp.tools import memory_tools, portability_tools
+    from smartmemory_mcp.tools import memory_tools, portability_tools, lifecycle_tools
 
     memory_tools.register_free(mcp)
     portability_tools.register(mcp)
+    lifecycle_tools.register(mcp)
 
     # PRO tier
     if tier >= Tier.PRO:
