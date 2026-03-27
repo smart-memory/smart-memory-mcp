@@ -9,11 +9,6 @@ from .common import get_backend, graceful
 logger = logging.getLogger(__name__)
 
 
-def _item_field(item, field, default=""):
-    if isinstance(item, dict):
-        return item.get(field, default)
-    return getattr(item, field, default)
-
 
 def register(mcp):
     """Register agent recall profile tools with the MCP server."""
@@ -38,9 +33,9 @@ def register(mcp):
         # Search for existing profile to update
         existing = backend.search(f"recall profile {agent_id}", top_k=10, memory_type="procedural")
         for item in (existing or []):
-            meta = _item_field(item, "metadata", {}) or {}
+            meta = item["metadata"]
             if meta.get("recall_profile") and meta.get("agent_id") == agent_id:
-                item_id = _item_field(item, "item_id", _item_field(item, "id", ""))
+                item_id = item["item_id"]
                 if item_id:
                     try:
                         backend.update(item_id, content=content)
@@ -77,9 +72,9 @@ def register(mcp):
         results = backend.search(f"recall profile {agent_id}", top_k=10, memory_type="procedural")
 
         for item in (results or []):
-            meta = _item_field(item, "metadata", {}) or {}
+            meta = item["metadata"]
             if meta.get("recall_profile") and meta.get("agent_id") == agent_id:
-                raw_content = _item_field(item, "content", "")
+                raw_content = item["content"]
                 try:
                     profile = json.loads(raw_content)
                     return f"Recall profile for {agent_id}: {json.dumps(profile, indent=2)}"

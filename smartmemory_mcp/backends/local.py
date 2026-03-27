@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from .models import MemoryResult, normalize_item, normalize_items
+
 log = logging.getLogger(__name__)
 
 
@@ -30,12 +32,12 @@ class LocalBackend:
         item = MemoryItem(content=content, memory_type=memory_type, metadata=metadata or {})
         return self._mem.add(item)
 
-    def get(self, item_id: str, **kwargs: Any) -> dict | None:
+    def get(self, item_id: str, **kwargs: Any) -> MemoryResult | None:
         """Retrieve a memory by ID."""
         result = self._mem.get(item_id)
         if result is None:
             return None
-        return result.to_dict() if hasattr(result, "to_dict") else result
+        return normalize_item(result)
 
     def update(self, item_id: str, content: str | None = None, metadata: dict | None = None, **kwargs: Any) -> str:
         """Update an existing memory."""
@@ -55,14 +57,14 @@ class LocalBackend:
 
     # -- Search --
 
-    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[dict]:
+    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[MemoryResult]:
         """Semantic search."""
         from smartmemory_app.storage import search
-        return search(query, top_k, **kwargs)
+        return normalize_items(search(query, top_k, **kwargs))
 
-    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[dict]:
+    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[MemoryResult]:
         """Search by metadata field."""
-        return self._mem.search_by_metadata(metadata_key, metadata_value, top_k=top_k)
+        return normalize_items(self._mem.search_by_metadata(metadata_key, metadata_value, top_k=top_k))
 
     # -- Ingest & Recall --
 
@@ -86,9 +88,9 @@ class LocalBackend:
 
     # -- Listing & Stats --
 
-    def list_memories(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> list[dict]:
+    def list_memories(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> list[MemoryResult]:
         """List memories with pagination."""
-        return self._mem.list_memories(limit=limit, offset=offset)
+        return normalize_items(self._mem.list_memories(limit=limit, offset=offset))
 
     def clear_user_memories(self, confirm: bool = False, **kwargs: Any) -> str:
         """Clear all user memories."""
@@ -137,13 +139,13 @@ class LocalBackend:
         """Memory summary."""
         return self._mem.summary(**kwargs)
 
-    def orphaned_notes(self, **kwargs: Any) -> list:
+    def orphaned_notes(self, **kwargs: Any) -> list[MemoryResult]:
         """Find orphaned notes."""
-        return self._mem.orphaned_notes(**kwargs)
+        return normalize_items(self._mem.orphaned_notes(**kwargs))
 
-    def find_old_notes(self, days: int = 90, **kwargs: Any) -> list:
+    def find_old_notes(self, days: int = 90, **kwargs: Any) -> list[MemoryResult]:
         """Find notes older than the given number of days."""
-        return self._mem.find_old_notes(days, **kwargs)
+        return normalize_items(self._mem.find_old_notes(days, **kwargs))
 
     def personalize(self, user_id: str = "mcp-user", traits: dict | None = None, preferences: dict | None = None, **kwargs: Any) -> str:
         """Personalize memory system."""
@@ -167,9 +169,9 @@ class LocalBackend:
         """Add a graph edge."""
         return self._mem.add_edge(source_id, target_id, relation_type=relation_type, **kwargs)
 
-    def get_links(self, item_id: str, **kwargs: Any) -> list:
+    def get_links(self, item_id: str, **kwargs: Any) -> list[MemoryResult]:
         """Get links for an item."""
-        return self._mem.get_links(item_id)
+        return normalize_items(self._mem.get_links(item_id))
 
     def get_neighbors(self, item_id: str, **kwargs: Any) -> dict:
         """Get graph neighbors."""

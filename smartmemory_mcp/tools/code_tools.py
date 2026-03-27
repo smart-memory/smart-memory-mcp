@@ -134,7 +134,7 @@ def register(mcp):
             results = backend.search(query, top_k=limit, memory_type="code")
             items = []
             for item in (results or []):
-                meta = item.metadata or {} if hasattr(item, "metadata") else {}
+                meta = item["metadata"]
                 if entity_type and meta.get("entity_type") != entity_type:
                     continue
                 if repo and meta.get("repo") != repo:
@@ -145,7 +145,7 @@ def register(mcp):
                     "file_path": meta.get("file_path", "?"),
                     "line_number": meta.get("line_number", "?"),
                     "repo": meta.get("repo", ""),
-                    "docstring": item.content[:200] if hasattr(item, "content") else "",
+                    "docstring": item["content"][:200],
                     "http_method": meta.get("http_method", ""),
                     "http_path": meta.get("http_path", ""),
                 })

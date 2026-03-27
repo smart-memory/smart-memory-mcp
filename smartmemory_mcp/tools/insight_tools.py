@@ -117,11 +117,11 @@ def register(mcp):
         ]
 
         if orphaned:
-            preview_ids = [getattr(i, "item_id", str(i)) for i in orphaned[:5]]
+            preview_ids = [i["item_id"] for i in orphaned[:5]]
             parts.append(f"  Preview: {', '.join(preview_ids)}")
 
         if stale:
-            preview_ids = [getattr(i, "item_id", str(i)) for i in stale[:5]]
+            preview_ids = [i["item_id"] for i in stale[:5]]
             parts.append(f"  Preview: {', '.join(preview_ids)}")
 
         return "\n".join(parts)

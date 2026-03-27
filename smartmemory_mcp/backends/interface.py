@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from .models import MemoryResult
+
 
 @runtime_checkable
 class MemoryBackend(Protocol):
@@ -19,7 +21,7 @@ class MemoryBackend(Protocol):
         """Store a memory item."""
         ...
 
-    def get(self, item_id: str, **kwargs: Any) -> dict[str, Any] | None:
+    def get(self, item_id: str, **kwargs: Any) -> MemoryResult | None:
         """Get a single memory by ID."""
         ...
 
@@ -33,11 +35,11 @@ class MemoryBackend(Protocol):
 
     # --- Search & Recall ---------------------------------------------------------
 
-    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[dict[str, Any]]:
+    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[MemoryResult]:
         """Semantic similarity search."""
         ...
 
-    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
+    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[MemoryResult]:
         """Search by metadata key-value match."""
         ...
 
@@ -57,7 +59,7 @@ class MemoryBackend(Protocol):
 
     # --- Collection operations ---------------------------------------------------
 
-    def list_memories(self, **kwargs: Any) -> list[dict[str, Any]]:
+    def list_memories(self, **kwargs: Any) -> list[MemoryResult]:
         """List all memory items."""
         ...
 
@@ -105,11 +107,11 @@ class MemoryBackend(Protocol):
         """Generate a summary of stored memories."""
         ...
 
-    def orphaned_notes(self, **kwargs: Any) -> list[dict[str, Any]]:
+    def orphaned_notes(self, **kwargs: Any) -> list[MemoryResult]:
         """Find notes without links to other memories."""
         ...
 
-    def find_old_notes(self, **kwargs: Any) -> list[dict[str, Any]]:
+    def find_old_notes(self, **kwargs: Any) -> list[MemoryResult]:
         """Find notes that haven't been accessed recently."""
         ...
 
@@ -137,7 +139,7 @@ class MemoryBackend(Protocol):
         """Add a typed edge between two items in the knowledge graph."""
         ...
 
-    def get_links(self, item_id: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def get_links(self, item_id: str, **kwargs: Any) -> list[MemoryResult]:
         """Get all links for a memory item."""
         ...
 

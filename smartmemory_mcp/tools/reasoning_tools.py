@@ -117,9 +117,9 @@ def register(mcp):
         ]
 
         for r in result.get("results", [])[:5]:
-            if hasattr(r, "content"):
-                preview = r.content[:150] + "..." if len(r.content) > 150 else r.content
-                parts.append(f"  - [{getattr(r, 'item_id', '?')}] {preview}")
+            if r.get("content"):
+                preview = r["content"][:150] + "..." if len(r["content"]) > 150 else r["content"]
+                parts.append(f"  - [{r['item_id']}] {preview}")
             else:
                 parts.append(f"  - {str(r)[:150]}")
 
@@ -228,10 +228,10 @@ def register(mcp):
 
         output = [f"Found {len(results)} reasoning traces:\n"]
         for item in results:
-            meta = item.get("metadata", {}) if isinstance(item, dict) else getattr(item, "metadata", {}) or {}
-            steps = meta.get("steps", []) if isinstance(meta, dict) else []
-            item_id = item.get("item_id", item.get("id", "?")) if isinstance(item, dict) else getattr(item, "item_id", "?")
-            content = str(item.get("content", "") if isinstance(item, dict) else getattr(item, "content", ""))
+            meta = item["metadata"]
+            steps = meta.get("steps", [])
+            item_id = item["item_id"]
+            content = item["content"]
             output.append(
                 f"- [{item_id}] ({len(steps)} steps): {content[:120]}"
             )

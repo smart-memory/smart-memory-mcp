@@ -22,13 +22,13 @@ def _get_items(backend) -> list[dict]:
 
 def _item_to_record(item: dict) -> dict:
     """Convert a memory item (dict) to an export record."""
-    meta = item.get("metadata", {}) or {}
+    meta = item["metadata"]
     return {
-        "content": item.get("content", ""),
-        "memory_type": item.get("memory_type", "semantic"),
+        "content": item["content"],
+        "memory_type": item["memory_type"],
         "metadata": meta,
         "created_at": item.get("created_at", ""),
-        "tags": item.get("tags", meta.get("tags", [])) if isinstance(meta, dict) else [],
+        "tags": meta.get("tags", []) if isinstance(meta, dict) else [],
         "origin": item.get("origin", ""),
     }
 

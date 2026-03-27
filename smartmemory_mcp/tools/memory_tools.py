@@ -9,15 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Helpers — all dict-safe (backends return dicts, not objects)
+# Helpers — backends return normalized dicts (MemoryResult)
 # ---------------------------------------------------------------------------
-
-
-def _item_field(item, field: str, default=""):
-    """Get a field from a dict or object."""
-    if isinstance(item, dict):
-        return item.get(field, default)
-    return getattr(item, field, default)
 
 
 def _relative_age(dt) -> str:
@@ -52,21 +45,19 @@ def _format_catalog(query: str, results: list) -> str:
 
     lines = [f"Memory catalog for '{query}' — {len(results)} results", "─" * 43]
     for i, item in enumerate(results, 1):
-        meta = _item_field(item, "metadata", {}) or {}
-        if isinstance(meta, str):
-            meta = {}
+        meta = item["metadata"] or {}
 
-        content = str(_item_field(item, "content", "")).replace("\n", " ")
-        title = str(meta.get("title", "")).replace("\n", " ") if isinstance(meta, dict) else ""
+        content = str(item["content"]).replace("\n", " ")
+        title = str(meta.get("title", "")).replace("\n", " ")
         snippet_src = title if title else content
         snippet = (snippet_src[:100] + "...") if len(snippet_src) > 100 else snippet_src
 
-        item_id = _item_field(item, "item_id", _item_field(item, "id", "?"))
-        mtype = _item_field(item, "memory_type", "?")
-        score = _item_field(item, "score", None)
+        item_id = item["item_id"]
+        mtype = item["memory_type"]
+        score = item.get("score")
         score_str = f"  {score:.3f}" if score is not None else ""
-        age_str = _relative_age(_item_field(item, "transaction_time", _item_field(item, "created_at", None)))
-        stale = meta.get("stale", False) if isinstance(meta, dict) else False
+        age_str = _relative_age(item.get("created_at"))
+        stale = meta.get("stale", False)
         stale_str = "  ⚠ stale" if stale else ""
 
         lines.append(f"{i}. {item_id}  {mtype}{score_str}  {age_str}{stale_str}")
@@ -92,17 +83,17 @@ def _format_recall(query: str, results: list, session_id: str = None, drift_warn
 
     lines = [f"Relevant prior context for '{query}':", ""]
     for i, item in enumerate(results, 1):
-        age_str = _relative_age(_item_field(item, "transaction_time", _item_field(item, "created_at", None)))
+        age_str = _relative_age(item.get("created_at"))
         age_part = f"{age_str} — " if age_str else ""
-        content = str(_item_field(item, "content", "")).replace("\n", " ↵ ")
+        content = str(item["content"]).replace("\n", " ↵ ")
         snippet = (content[:300] + "…") if len(content) > 300 else content
         lines.append(f"[{i}] {age_part}{snippet}")
         lines.append("")
 
     item_ids = ", ".join(
-        str(_item_field(item, "item_id", _item_field(item, "id", "")))
+        str(item["item_id"])
         for item in results
-        if _item_field(item, "item_id", _item_field(item, "id", ""))
+        if item["item_id"]
     )
     lines.append(
         f"(Retrieved {len(results)} turns."
@@ -114,10 +105,10 @@ def _format_recall(query: str, results: list, session_id: str = None, drift_warn
         lines.append("")
         lines.append("⚠ Anchor drift warnings:")
         for dw in drift_warnings:
-            severity = _item_field(dw, "severity", "unknown")
-            acontent = str(_item_field(dw, "anchor_content", ""))[:100]
-            dscore = _item_field(dw, "drift_score", 0)
-            missing = _item_field(dw, "missing_keywords", [])[:5]
+            severity = dw.get("severity", "unknown")
+            acontent = str(dw.get("anchor_content", ""))[:100]
+            dscore = dw.get("drift_score", 0)
+            missing = dw.get("missing_keywords", [])[:5]
             missing_str = ", ".join(missing) if missing else "none"
             lines.append(f"  [{severity}] {acontent} (drift={dscore:.2f}, missing: {missing_str})")
 
@@ -183,24 +174,24 @@ def register_free(mcp):
 
         output = [f"Found {len(results)} results for '{query}':\n"]
         for i, item in enumerate(results, 1):
-            content = str(_item_field(item, "content", ""))
+            content = str(item["content"])
             preview = content[:200] + "..." if len(content) > 200 else content
-            item_id = _item_field(item, "item_id", _item_field(item, "id", "?"))
-            mtype = _item_field(item, "memory_type", "?")
-            score = _item_field(item, "score", None)
+            item_id = item["item_id"]
+            mtype = item["memory_type"]
+            score = item.get("score")
             score_str = f" (score: {score:.3f})" if score is not None else ""
 
             # CORE-PROPS-1: confidence display
-            confidence = _item_field(item, "confidence", None)
+            confidence = item.get("confidence")
             conf_str = f" [conf: {confidence:.2f}]" if confidence is not None else ""
 
             # CORE-PROPS-1: stale marker
-            stale = _item_field(item, "stale", False)
+            stale = item.get("stale", False)
             stale_prefix = "⚠" if stale else ""
             stale_suffix = " [STALE]" if stale else ""
 
             # CORE-PROPS-1: lineage (derived_from)
-            derived = _item_field(item, "derived_from", "")
+            derived = item.get("derived_from", "")
             lineage_str = f" [→{str(derived)[:8]}]" if derived else ""
 
             # CORE-PROPS-1: low-confidence tilde marker
@@ -233,12 +224,8 @@ def register_free(mcp):
         if session_id and results:
             results = [
                 r for r in results
-                if _item_field(
-                    _item_field(r, "metadata", {}) or {}, "conversation_id", ""
-                ) == session_id
-                or _item_field(
-                    _item_field(r, "metadata", {}) or {}, "session_id", ""
-                ) == session_id
+                if (r["metadata"] or {}).get("conversation_id", "") == session_id
+                or (r["metadata"] or {}).get("session_id", "") == session_id
             ]
 
         return _format_recall(query, results[:top_k], session_id=session_id)
@@ -253,9 +240,9 @@ def register_free(mcp):
         if item is None:
             return f"Memory item not found: {item_id}"
 
-        content = _item_field(item, "content", "")
-        mtype = _item_field(item, "memory_type", "unknown")
-        meta = _item_field(item, "metadata", {})
+        content = item["content"]
+        mtype = item["memory_type"]
+        meta = item["metadata"]
 
         parts = [
             f"Memory Item: {item_id}",
@@ -339,9 +326,9 @@ def register_pro(mcp):
 
         output = [f"Showing {len(items)} of {total} memories:\n"]
         for item in items:
-            item_id = _item_field(item, "item_id", _item_field(item, "id", "?"))
-            content = str(_item_field(item, "content", ""))
-            mtype = _item_field(item, "memory_type", "?")
+            item_id = item["item_id"]
+            content = str(item["content"])
+            mtype = item["memory_type"]
             preview = content[:100] + "..." if len(content) > 100 else content
             output.append(f"- [{item_id}] ({mtype}): {preview}")
 
@@ -408,10 +395,10 @@ def register_pro(mcp):
 
         output = [f"SSG ({algorithm}) found {len(results)} results for '{query}':\n"]
         for i, item in enumerate(results, 1):
-            content = str(_item_field(item, "content", ""))
+            content = str(item["content"])
             preview = content[:200] + "..." if len(content) > 200 else content
-            item_id = _item_field(item, "item_id", _item_field(item, "id", "?"))
-            mtype = _item_field(item, "memory_type", "?")
+            item_id = item["item_id"]
+            mtype = item["memory_type"]
             output.append(f"{i}. [{item_id}] ({mtype})")
             output.append(f"   {preview}\n")
 
@@ -429,10 +416,10 @@ def register_pro(mcp):
 
         output = [f"Found {len(results)} memories with {metadata_key}={metadata_value}:\n"]
         for item in results:
-            content = str(_item_field(item, "content", ""))
+            content = str(item["content"])
             preview = content[:150] + "..." if len(content) > 150 else content
-            item_id = _item_field(item, "item_id", _item_field(item, "id", "?"))
-            mtype = _item_field(item, "memory_type", "?")
+            item_id = item["item_id"]
+            mtype = item["memory_type"]
             output.append(f"- [{item_id}] ({mtype}): {preview}")
 
         return "\n".join(output)

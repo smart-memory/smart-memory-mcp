@@ -11,6 +11,8 @@ from typing import Any, Optional
 
 import httpx
 
+from .models import MemoryResult, normalize_item, normalize_items
+
 
 class RemoteBackend:
     """HTTP client implementing MemoryBackend protocol for the hosted SmartMemory API."""
@@ -160,12 +162,12 @@ class RemoteBackend:
             return result.get("item_id", result.get("id", str(result)))
         return str(result)
 
-    def get(self, item_id: str, **kwargs: Any) -> dict[str, Any] | None:
+    def get(self, item_id: str, **kwargs: Any) -> MemoryResult | None:
         """GET /memory/{item_id}."""
         result = self._request("GET", f"/memory/{item_id}")
         if result is None or self._fmt_error(result):
             return None
-        return result
+        return normalize_item(result)
 
     def update(self, item_id: str, **kwargs: Any) -> dict[str, Any]:
         """PUT /memory/{item_id}."""
@@ -184,7 +186,7 @@ class RemoteBackend:
             return False
         return True
 
-    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[dict[str, Any]]:
+    def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[MemoryResult]:
         """POST /memory/search."""
         body: dict[str, Any] = {"query": query, "top_k": top_k}
         if kwargs.get("enable_hybrid", True):
@@ -199,17 +201,19 @@ class RemoteBackend:
         result = self._request("POST", "/memory/search", json=body)
         if isinstance(result, dict) and self._fmt_error(result):
             return [result]
-        return result if isinstance(result, list) else []
+        raw = result if isinstance(result, list) else []
+        return normalize_items(raw)
 
-    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[dict[str, Any]]:
+    def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[MemoryResult]:
         """GET /memory/by-metadata — exact metadata match."""
         params = {"metadata_key": metadata_key, "metadata_value": metadata_value}
         result = self._request("GET", "/memory/by-metadata", params=params)
         if isinstance(result, dict):
             if self._fmt_error(result):
                 return [result]
-            return [result]  # Single item returned by service
-        return result if isinstance(result, list) else []
+            return normalize_items([result])  # Single item returned by service
+        raw = result if isinstance(result, list) else []
+        return normalize_items(raw)
 
     def recall(self, cwd: str | None = None, top_k: int = 10, **kwargs: Any) -> str:
         """Client-side recall — no /memory/recall endpoint in the hosted API."""
@@ -219,15 +223,15 @@ class RemoteBackend:
         recent = self.search("", top_k=recent_k)
         semantic = self.search(cwd or "", top_k=semantic_k) if cwd and semantic_k else []
         seen: set[str] = set()
-        items: list[dict[str, Any]] = []
+        items: list[MemoryResult] = []
         for r in recent + semantic:
-            iid = r.get("item_id") or r.get("id") or ""
+            iid = r["item_id"]
             if iid and iid not in seen:
                 seen.add(iid)
                 items.append(r)
         recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
         items = [r for r in items if (r.get("confidence") if r.get("confidence") is not None else 1.0) >= recall_floor]
-        items = [r for r in items if not r.get("reference", False)]
+        items = [r for r in items if not r.get("reference")]
         if not items:
             return ""
         lines = ["## SmartMemory Context"]
@@ -235,7 +239,7 @@ class RemoteBackend:
             conf = item.get("confidence", 1.0)
             conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
             stale_marker = "" if not item.get("stale") else "!"
-            lines.append(f"- {stale_marker}{conf_marker}[{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
+            lines.append(f"- {stale_marker}{conf_marker}[{item['memory_type']}] {item['content'][:200]}")
         return "\n".join(lines)
 
     def ingest(self, content: str, memory_type: str = "semantic", **kwargs: Any) -> dict[str, Any] | str:
@@ -271,7 +275,7 @@ class RemoteBackend:
         except Exception as e:
             return {"healthy": False, "error": str(e), "api_url": self._api_url}
 
-    def list_memories(self, **kwargs: Any) -> list[dict[str, Any]]:
+    def list_memories(self, **kwargs: Any) -> list[MemoryResult]:
         """GET /memory/list — list all memories."""
         params: dict[str, str] = {}
         if "limit" in kwargs:
@@ -283,8 +287,10 @@ class RemoteBackend:
             if self._fmt_error(result):
                 return []
             # Service returns paginated dict with "items" and "total"
-            return result.get("items", [])
-        return result if isinstance(result, list) else []
+            raw = result.get("items", [])
+        else:
+            raw = result if isinstance(result, list) else []
+        return normalize_items(raw)
 
     # --- MemoryBackend protocol: NOT available in remote mode --------------------
 
