@@ -1,15 +1,24 @@
 """Contract tests for CORE-PROPS-1 Phase 1b: confidence in MCP search results.
 
 Verifies that memory_search output includes confidence values and ~ markers.
-Uses the same mock pattern as test_server_decompose.py.
 """
 
 from unittest.mock import patch
 
 
+class MockBackend:
+    def __init__(self, items=None):
+        self._items = items or []
+        self.last_search_kwargs = {}
+
+    def search(self, query, top_k=5, **kwargs):
+        self.last_search_kwargs = {"query": query, "top_k": top_k, **kwargs}
+        return self._items
+
+
 class TestConfidenceDisplay:
     def _call_search(self, mock_items, **kwargs):
-        """Call memory_search with mocked _request returning mock_items."""
+        """Call memory_search with MockBackend returning mock_items."""
         import smartmemory_mcp.server as srv
 
         fn = None
@@ -20,11 +29,9 @@ class TestConfidenceDisplay:
 
         assert fn is not None, "memory_search tool not found"
 
-        def mock_request(method, path, workspace_id=None, json=None, **kw):
-            return mock_items
-
-        with patch.object(srv, "_request", side_effect=mock_request):
-            result = fn(query="test", **kwargs)
+        mock_backend = MockBackend(mock_items)
+        with patch("smartmemory_mcp.tools.common._backend", mock_backend):
+            result = fn(query="test", catalog_mode=False, **kwargs)
 
         return result
 

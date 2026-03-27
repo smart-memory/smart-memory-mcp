@@ -1,21 +1,24 @@
 """Unit tests for standalone MCP memory_search decompose param."""
 
-import importlib
-from unittest.mock import patch, MagicMock
-from fastmcp import FastMCP
+from unittest.mock import patch
+
+
+class MockBackend:
+    def __init__(self, items=None):
+        self._items = items or []
+        self.last_search_kwargs = {}
+
+    def search(self, query, top_k=5, **kwargs):
+        self.last_search_kwargs = {"query": query, "top_k": top_k, **kwargs}
+        return self._items
 
 
 class TestServerDecompose:
     def _call_search(self, **kwargs):
-        """Call memory_search and capture the REST body sent to _request."""
-        # Re-import to get fresh module; extract the original function from the tool
+        """Call memory_search and capture kwargs sent to backend.search()."""
         import smartmemory_mcp.server as srv
 
-        captured_body = {}
-
-        def mock_request(method, path, workspace_id=None, json=None, **kw):
-            captured_body.update(json or {})
-            return []
+        mock_backend = MockBackend()
 
         # Find the memory_search tool and call its underlying function
         fn = None
@@ -26,20 +29,20 @@ class TestServerDecompose:
 
         assert fn is not None, "memory_search tool not found"
 
-        with patch.object(srv, "_request", side_effect=mock_request):
+        with patch("smartmemory_mcp.tools.common._backend", mock_backend):
             result = fn(**kwargs)
 
-        return result, captured_body
+        return result, mock_backend.last_search_kwargs
 
     def test_decompose_false_not_in_body(self):
-        _, body = self._call_search(query="auth")
-        assert "decompose" not in body
+        _, search_kwargs = self._call_search(query="auth")
+        assert search_kwargs.get("decompose_query") is False
 
     def test_decompose_true_in_body(self):
-        _, body = self._call_search(query="auth", decompose=True)
-        assert body["decompose"] is True
+        _, search_kwargs = self._call_search(query="auth", decompose=True)
+        assert search_kwargs["decompose_query"] is True
 
     def test_enable_hybrid_default_true(self):
         """TECHDEBT-SEARCH-1: standalone MCP sends enable_hybrid=True by default."""
-        _, body = self._call_search(query="auth")
-        assert body["enable_hybrid"] is True
+        _, search_kwargs = self._call_search(query="auth")
+        assert search_kwargs["enable_hybrid"] is True

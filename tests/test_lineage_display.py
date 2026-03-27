@@ -3,6 +3,16 @@
 from unittest.mock import patch
 
 
+class MockBackend:
+    def __init__(self, items=None):
+        self._items = items or []
+        self.last_search_kwargs = {}
+
+    def search(self, query, top_k=5, **kwargs):
+        self.last_search_kwargs = {"query": query, "top_k": top_k, **kwargs}
+        return self._items
+
+
 class TestLineageDisplay:
     def _call_search(self, mock_items):
         import smartmemory_mcp.server as srv
@@ -13,11 +23,9 @@ class TestLineageDisplay:
                 break
         assert fn is not None
 
-        def mock_request(method, path, workspace_id=None, json=None, **kw):
-            return mock_items
-
-        with patch.object(srv, "_request", side_effect=mock_request):
-            return fn(query="test")
+        mock_backend = MockBackend(mock_items)
+        with patch("smartmemory_mcp.tools.common._backend", mock_backend):
+            return fn(query="test", catalog_mode=False)
 
     def test_derived_from_shown(self):
         items = [{"item_id": "derived-1", "memory_type": "semantic", "content": "Derived item",
