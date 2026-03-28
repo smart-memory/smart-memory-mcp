@@ -147,6 +147,9 @@ def register_free(mcp):
         catalog_mode: bool = True,
         decompose: bool = False,
         channel_weights: Optional[dict] = None,
+        multi_hop: bool = False,
+        max_hops: int = 3,
+        budget_ms: int = 1500,
     ) -> str:
         """Search memories using semantic similarity with optional hybrid mode."""
         backend = get_backend()
@@ -157,6 +160,9 @@ def register_free(mcp):
             enable_hybrid=enable_hybrid,
             decompose_query=decompose,
             channel_weights=channel_weights,
+            multi_hop=multi_hop,
+            max_hops=max_hops,
+            budget_ms=budget_ms,
         )
 
         # CORE-ORIGIN-1: apply search tier policy

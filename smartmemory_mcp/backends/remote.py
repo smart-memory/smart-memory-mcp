@@ -198,6 +198,13 @@ class RemoteBackend:
         for key in ("memory_type", "include_reference"):
             if key in kwargs and kwargs[key]:
                 body[key] = kwargs[key]
+        # RLM-1c: forward multi-hop params
+        if kwargs.get("multi_hop"):
+            body["multi_hop"] = True
+            if "max_hops" in kwargs:
+                body["max_hops"] = kwargs["max_hops"]
+            if "budget_ms" in kwargs:
+                body["budget_ms"] = kwargs["budget_ms"]
         result = self._request("POST", "/memory/search", json=body)
         if isinstance(result, dict) and self._fmt_error(result):
             return [result]
