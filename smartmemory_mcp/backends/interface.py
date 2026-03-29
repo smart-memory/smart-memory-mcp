@@ -57,6 +57,20 @@ class MemoryBackend(Protocol):
         """Ingest structured data with an optional schema."""
         ...
 
+    def ingest_conversation_sync(
+        self,
+        turns: list,
+        session_boundaries: list | None = None,
+        conversation_id: str | None = None,
+        session_dates: list | None = None,
+        turns_per_chunk: int = 15,
+        max_chunk_chars: int = 12000,
+        max_concurrent: int = 4,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Ingest a conversation as session chunks (RLM-1g)."""
+        ...
+
     # --- Collection operations ---------------------------------------------------
 
     def list_memories(self, **kwargs: Any) -> list[MemoryResult]:

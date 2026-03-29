@@ -262,6 +262,36 @@ class RemoteBackend:
             return {"error": err}
         return result or {}
 
+    def ingest_conversation_sync(
+        self,
+        turns: list,
+        session_boundaries: list | None = None,
+        conversation_id: str | None = None,
+        session_dates: list | None = None,
+        turns_per_chunk: int = 15,
+        max_chunk_chars: int = 12000,
+        max_concurrent: int = 4,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """POST /memory/ingest/conversation (RLM-1g)."""
+        body: dict[str, Any] = {"turns": turns}
+        if session_boundaries is not None:
+            body["session_boundaries"] = session_boundaries
+        if conversation_id is not None:
+            body["conversation_id"] = conversation_id
+        if session_dates is not None:
+            body["session_dates"] = session_dates
+        if turns_per_chunk != 15:
+            body["turns_per_chunk"] = turns_per_chunk
+        if max_chunk_chars != 12000:
+            body["max_chunk_chars"] = max_chunk_chars
+        if max_concurrent != 4:
+            body["max_concurrent"] = max_concurrent
+        result = self._request("POST", "/memory/ingest/conversation", timeout=300, json=body)
+        if err := self._fmt_error(result):
+            return {"error": err}
+        return result or {}
+
     def clear_user_memories(self, **kwargs: Any) -> dict[str, Any]:
         """DELETE /memory/clear-all."""
         params: dict[str, str] = {}

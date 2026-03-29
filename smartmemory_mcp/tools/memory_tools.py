@@ -378,6 +378,49 @@ def register_pro(mcp):
 
     @mcp.tool()
     @graceful
+    def memory_ingest_conversation(
+        turns: list,
+        session_boundaries: Optional[list] = None,
+        conversation_id: Optional[str] = None,
+        session_dates: Optional[list] = None,
+        turns_per_chunk: int = 15,
+        max_chunk_chars: int = 12000,
+    ) -> str:
+        """Ingest a conversation as session chunks with full pipeline processing (RLM-1g).
+
+        Groups turns into sessions (by explicit boundaries or auto-chunking),
+        runs each chunk through the full extraction pipeline, and creates
+        a conversation container node with PART_OF edges.
+
+        Args:
+            turns: List of dicts with "role"/"speaker" and "content" keys.
+            session_boundaries: Turn indices where sessions start (e.g. [0, 50, 120]).
+            conversation_id: User-supplied ID (auto-generated if None).
+            session_dates: ISO date per session for metadata.
+            turns_per_chunk: Max turns per auto-chunk (default 15).
+            max_chunk_chars: Safety split for oversized chunks (default 12000).
+        """
+        backend = get_backend()
+        response = backend.ingest_conversation_sync(
+            turns=turns,
+            session_boundaries=session_boundaries,
+            conversation_id=conversation_id,
+            session_dates=session_dates,
+            turns_per_chunk=turns_per_chunk,
+            max_chunk_chars=max_chunk_chars,
+        )
+        if isinstance(response, dict):
+            ingested = response.get("chunks_ingested", 0)
+            failed = response.get("chunks_failed", 0)
+            conv_id = response.get("conversation_id", "")
+            return f"Conversation {conv_id}: {ingested} chunks ingested, {failed} failed."
+        from dataclasses import asdict
+
+        r = asdict(response) if hasattr(response, "__dataclass_fields__") else response
+        return f"Conversation ingested: {r}"
+
+    @mcp.tool()
+    @graceful
     def memory_search_advanced(query: str, algorithm: str = "query_traversal", max_results: int = 15) -> str:
         """Advanced search using Similarity Graph Traversal (SSG) algorithms."""
         try:

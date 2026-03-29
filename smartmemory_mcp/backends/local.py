@@ -86,6 +86,31 @@ class LocalBackend:
         name = schema or schema_name
         return self._mem.ingest_structured(data, schema=name)
 
+    def ingest_conversation_sync(
+        self,
+        turns: list,
+        session_boundaries: list | None = None,
+        conversation_id: str | None = None,
+        session_dates: list | None = None,
+        turns_per_chunk: int = 15,
+        max_chunk_chars: int = 12000,
+        max_concurrent: int = 4,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Conversation bulk ingestion via local SmartMemory (RLM-1g)."""
+        from dataclasses import asdict
+
+        response = self._mem.ingest_conversation_sync(
+            turns,
+            session_boundaries=session_boundaries,
+            conversation_id=conversation_id,
+            session_dates=session_dates,
+            turns_per_chunk=turns_per_chunk,
+            max_chunk_chars=max_chunk_chars,
+            max_concurrent=max_concurrent,
+        )
+        return asdict(response) if hasattr(response, "__dataclass_fields__") else response
+
     # -- Listing & Stats --
 
     def list_memories(self, limit: int = 100, offset: int = 0, **kwargs: Any) -> list[MemoryResult]:
