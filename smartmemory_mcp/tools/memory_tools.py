@@ -153,9 +153,12 @@ def register_free(mcp):
     ) -> str:
         """Search memories using semantic similarity with optional hybrid mode."""
         backend = get_backend()
+        # SELF-IMPROVE-6 fix: pass actual top_k, not 3x over-fetch.
+        # Over-fetch for origin filtering + reranking happens server-side.
+        # The old 3x inflated shown_ids for feedback, diluting selection_rate.
         results = backend.search(
             query,
-            top_k=top_k * 3,
+            top_k=top_k,
             memory_type=memory_type,
             enable_hybrid=enable_hybrid,
             decompose_query=decompose,
@@ -177,8 +180,15 @@ def register_free(mcp):
         if not results:
             return f"No results found for query: {query}"
 
+        # SELF-IMPROVE-6: capture search_session_id from backend (RemoteBackend stores it
+        # on _last_search_session_id after reading the X-Search-Session-Id response header).
+        session_id_from_search: str | None = getattr(backend, "_last_search_session_id", None)
+
         if catalog_mode:
-            return _format_catalog(query, results)
+            catalog = _format_catalog(query, results)
+            if session_id_from_search:
+                catalog += f"\n\nsearch_session_id: {session_id_from_search}"
+            return catalog
 
         output = [f"Found {len(results)} results for '{query}':\n"]
         for i, item in enumerate(results, 1):
@@ -208,6 +218,8 @@ def register_free(mcp):
             output.append(f"{i}. {stale_prefix}{id_display} ({mtype}){score_str}{conf_str}{lineage_str}{stale_suffix}")
             output.append(f"   {preview}\n")
 
+        if session_id_from_search:
+            output.append(f"\nsearch_session_id: {session_id_from_search}")
         return "\n".join(output)
 
     @mcp.tool()
@@ -474,3 +486,37 @@ def register_pro(mcp):
             output.append(f"- [{item_id}] ({mtype}): {preview}")
 
         return "\n".join(output)
+
+
+# ---------------------------------------------------------------------------
+# SELF-IMPROVE-6: Retrieval feedback tool
+# ---------------------------------------------------------------------------
+
+
+def register_feedback(mcp):
+    """Register result-selection feedback tool (SELF-IMPROVE-6)."""
+
+    @mcp.tool()
+    @graceful
+    def memory_feedback(search_session_id: str, result_used: List[str]) -> str:
+        """Report which search results you used from a previous memory_search call.
+
+        Call this after using results from memory_search to help SmartMemory learn
+        which memories are actually useful. Pass the search_session_id from the
+        memory_search response and the item_ids you incorporated into your response.
+
+        Args:
+            search_session_id: The session ID returned at the bottom of the
+                memory_search output (e.g. "search:ws123:abc456def789").
+            result_used: List of item_ids from the search results that you used.
+                Pass an empty list if none of the results were useful.
+        """
+        backend = get_backend()
+        result = backend.submit_feedback(search_session_id=search_session_id, result_used=result_used)
+        if isinstance(result, dict):
+            if "error" in result:
+                return f"Feedback failed: {result['error']}"
+            used = result.get("result_used_count", len(result_used))
+            shown = result.get("result_shown_count", "?")
+            return f"Feedback recorded: used {used} of {shown} shown results (session: {search_session_id})"
+        return f"Feedback recorded for session: {search_session_id}"
