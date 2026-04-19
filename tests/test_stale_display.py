@@ -72,7 +72,7 @@ class TestStaleDisplay:
         items = [
             {
                 "item_id": "nofld123",
-                "memory_type": "working",
+                "memory_type": "pending",
                 "content": "No stale field",
             }
         ]

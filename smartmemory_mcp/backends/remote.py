@@ -343,13 +343,8 @@ class RemoteBackend:
         """Not available in remote mode."""
         raise NotImplementedError("Not available in remote mode. Use local backend.")
 
-    def commit_working_to_episodic(self, **kwargs: Any) -> dict[str, Any]:
-        """Not available in remote mode."""
-        raise NotImplementedError("Not available in remote mode. Use local backend.")
-
-    def commit_working_to_procedural(self, **kwargs: Any) -> dict[str, Any]:
-        """Not available in remote mode."""
-        raise NotImplementedError("Not available in remote mode. Use local backend.")
+    # CORE-MEMORY-DYNAMICS-1 M1b: commit_working_to_* removed — ConsolidationRouter
+    # now routes at ingest.
 
     def run_evolver(self, evolver_name: str, **kwargs: Any) -> dict[str, Any]:
         """Not available in remote mode."""

@@ -92,7 +92,7 @@ class TestNormalizeItem:
         class LegacyItem:
             id = "legacy-id"
             content = "legacy content"
-            memory_type = "working"
+            memory_type = "pending"
             metadata = {"src": "test"}
             transaction_time = "2026-03-27"
             score = 0.75

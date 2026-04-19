@@ -95,13 +95,11 @@ class MemoryBackend(Protocol):
         """Run a full evolution cycle across all evolvers."""
         ...
 
-    def commit_working_to_episodic(self, **kwargs: Any) -> dict[str, Any]:
-        """Commit working memory items to episodic storage."""
-        ...
-
-    def commit_working_to_procedural(self, **kwargs: Any) -> dict[str, Any]:
-        """Commit working memory items to procedural storage."""
-        ...
+    # CORE-MEMORY-DYNAMICS-1 M1b: commit_working_to_episodic / commit_working_to_procedural
+    # removed from the protocol. The core façades are gone — the ConsolidationRouter
+    # now routes pending items at ingest. Backends that previously implemented these
+    # methods should drop them; callers should use add()/ingest() with
+    # memory_type="pending".
 
     def run_evolver(self, evolver_name: str, **kwargs: Any) -> dict[str, Any]:
         """Run a specific evolver by name."""

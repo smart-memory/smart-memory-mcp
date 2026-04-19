@@ -508,13 +508,13 @@ def register_pro(mcp):
     @mcp.tool()
     @graceful
     def memory_distill(user_turn: str, assistant_turn: str, session_id: Optional[str] = None) -> str:
-        """Ingest a conversation turn pair into working memory for later recall."""
+        """Ingest a conversation turn pair into pending memory for later recall."""
         backend = get_backend()
         content = _format_turn_content(user_turn, assistant_turn)
         meta: Dict[str, Any] = {"role": "turn", "distill_version": "1"}
         if session_id:
             meta["conversation_id"] = session_id
-        item_id = backend.add(content, memory_type="working", metadata=meta)
+        item_id = backend.add(content, memory_type="pending", metadata=meta)
         return f"Turn stored: {item_id}"
 
     @mcp.tool()

@@ -138,13 +138,9 @@ class LocalBackend:
         """Trigger evolution cycle."""
         return self._mem.run_evolution_cycle(**kwargs)
 
-    def commit_working_to_episodic(self, **kwargs: Any) -> dict:
-        """Commit working memory to episodic."""
-        return self._mem.commit_working_to_episodic(**kwargs)
-
-    def commit_working_to_procedural(self, **kwargs: Any) -> dict:
-        """Commit working memory to procedural."""
-        return self._mem.commit_working_to_procedural(**kwargs)
+    # CORE-MEMORY-DYNAMICS-1 M1b: commit_working_to_* removed — core façades
+    # are gone, ConsolidationRouter routes at ingest. Use add()/ingest() with
+    # memory_type="pending" instead.
 
     def run_evolver(self, evolver_class: Any, **kwargs: Any) -> dict:
         """Run a specific evolver."""

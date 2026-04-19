@@ -81,7 +81,7 @@ class TestConfidenceDisplay:
         items = [
             {
                 "item_id": "jkl22222",
-                "memory_type": "working",
+                "memory_type": "pending",
                 "content": "No confidence field",
             }
         ]
