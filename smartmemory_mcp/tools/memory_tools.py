@@ -1,11 +1,89 @@
 """Memory CRUD, search, list, and stats MCP tools."""
 
 import logging
+import uuid as _uuid
 from typing import Any, Dict, List, Optional
 
 from .common import get_backend, graceful
 
 logger = logging.getLogger(__name__)
+
+
+# CORE-MEMORY-DYNAMICS-1 M1a — legacy memory_recall() scope for the standalone MCP.
+# Pre-shim memory_recall filtered to memory_type="working" (memory_tools.py:241).
+# Matches the service repo's scope; per plan-m1a.md both repos derive independently.
+_LEGACY_RECALL_TYPE_SCOPE: set = {"working"}
+
+# Module-level one-shot deprecation flag — logs exactly once per process.
+_RECALL_DEPRECATION_WARNED: bool = False
+
+
+def _estimate_tokens(text: str) -> int:
+    """Cheap per-item token estimate — 1 token ≈ 4 characters."""
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
+def _build_working_context(
+    backend,
+    session_id: str,
+    query: str,
+    k: int,
+    max_tokens: Optional[int],
+    strategy: Optional[str],
+) -> Dict[str, Any]:
+    """Build a contract-shaped surfacing response against the backend.
+
+    Standalone MCP has no SmartMemory instance — we compose the response
+    from ``backend.search`` directly.  Mirrors
+    ``SmartMemory.get_working_context`` from core.  Anchors are NOT
+    supported in the standalone (no AnchorQueries).
+    """
+    decision_id = _uuid.uuid4().hex
+    fetch_k = max(k * 5, k)
+    raw = list(backend.search(query, top_k=fetch_k) or [])
+
+    items: List[Dict[str, Any]] = []
+    tokens_used = 0
+    for row in raw[:k]:
+        # ``row`` is a MemoryResult dict returned by backend.search.
+        content = row.get("content", "")
+        item_tokens = _estimate_tokens(content)
+        if max_tokens is not None and tokens_used + item_tokens > max_tokens:
+            break
+        items.append({
+            "item_id": row.get("item_id"),
+            "content": content,
+            "memory_type": row.get("memory_type"),
+            "metadata": row.get("metadata") or {},
+            "score_breakdown": {
+                "activation": 0.5,
+                "relevance": float(row.get("score") or 0.0),
+                "recency": 1.0,
+                "centrality": 1.0,
+                "anchor_forced": False,
+                "session_pin_boost": 0.0,
+                "freshness_boost": 0.0,
+            },
+        })
+        tokens_used += item_tokens
+
+    if max_tokens is not None and raw and not items:
+        # Smallest mandatory item exceeds budget.
+        raise ValueError(
+            f"budget_too_small: max_tokens={max_tokens} cannot fit the smallest item"
+        )
+
+    return {
+        "decision_id": decision_id,
+        "items": items,
+        "drift_warnings": [],
+        "strategy_used": "fast:recency",
+        "tokens_used": tokens_used,
+        "tokens_budget": max_tokens,
+        "deprecation": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -225,30 +303,80 @@ def register_free(mcp):
     @mcp.tool()
     @graceful
     def memory_recall(query: str, session_id: Optional[str] = None, top_k: int = 5) -> str:
-        """Retrieve relevant prior conversation turns for prompt injection."""
+        """**Deprecated:** Use ``get_working_context``.
+
+        Legacy surface kept for backward compatibility.  Internally
+        delegates to the surfacing helper (CORE-MEMORY-DYNAMICS-1 M1a) and
+        post-filters cross-type results through ``_LEGACY_RECALL_TYPE_SCOPE``
+        to preserve the pre-shim ``memory_type="working"`` scope.
+        """
+        global _RECALL_DEPRECATION_WARNED
+        if not _RECALL_DEPRECATION_WARNED:
+            logger.warning(
+                "memory_recall is deprecated; use get_working_context "
+                "(CORE-MEMORY-DYNAMICS-1 M1a). Logged once per process."
+            )
+            _RECALL_DEPRECATION_WARNED = True
+
         if top_k < 1:
             return "top_k must be at least 1."
 
         backend = get_backend()
-        # Try native recall first (LocalBackend has it)
+        # Native backend.recall path preserved for LocalBackend's fast path.
         if hasattr(backend, "recall") and not session_id:
             result = backend.recall(cwd=query, top_k=top_k)
             if isinstance(result, str):
                 return result
 
-        # Fallback: search working memory
-        fetch_k = top_k * 5 if session_id else top_k
-        results = backend.search(query, top_k=fetch_k, memory_type="working")
+        # Delegate to the surfacing helper, then apply legacy-scope post-filter.
+        # Over-fetch aggressively (10x, clamp to contract max 100) so the
+        # post-filter has headroom when cross-type retrieval returns few
+        # working-typed items in its top-k (Codex review).
+        response = _build_working_context(
+            backend, session_id=session_id or "", query=query,
+            k=min(max(top_k * 10, top_k), 100), max_tokens=None, strategy=None,
+        )
 
-        # Filter by session_id if provided
-        if session_id and results:
-            results = [
-                r for r in results
-                if (r["metadata"] or {}).get("conversation_id", "") == session_id
-                or (r["metadata"] or {}).get("session_id", "") == session_id
+        filtered: List[dict] = []
+        for item in response["items"]:
+            mtype = item.get("memory_type")
+            anchor_forced = bool((item.get("score_breakdown") or {}).get("anchor_forced"))
+            if anchor_forced or mtype in _LEGACY_RECALL_TYPE_SCOPE:
+                filtered.append(item)
+
+        # Additional session_id filter preserved from pre-shim behavior.
+        if session_id:
+            filtered = [
+                r for r in filtered
+                if (r.get("metadata") or {}).get("conversation_id", "") == session_id
+                or (r.get("metadata") or {}).get("session_id", "") == session_id
             ]
 
-        return _format_recall(query, results[:top_k], session_id=session_id)
+        return _format_recall(query, filtered[:top_k], session_id=session_id)
+
+    @mcp.tool()
+    @graceful
+    def get_working_context(
+        session_id: str,
+        query: str,
+        k: int = 20,
+        max_tokens: Optional[int] = None,
+        strategy: Optional[str] = None,
+    ) -> dict:
+        """Retrieve a structured surfacing response (CORE-MEMORY-DYNAMICS-1 M1a).
+
+        Returns JSON matching
+        ``smart-memory-docs/docs/features/CORE-MEMORY-DYNAMICS-1/context-api-contract.json``.
+        Cross-type retrieval, ``strategy_used="fast:recency"``.  Standalone
+        MCP does not currently compose anchors.
+        """
+        if k < 1 or k > 100:
+            raise ValueError("k must be in 1..100")
+        backend = get_backend()
+        return _build_working_context(
+            backend, session_id=session_id, query=query,
+            k=k, max_tokens=max_tokens, strategy=strategy,
+        )
 
     @mcp.tool()
     @graceful
