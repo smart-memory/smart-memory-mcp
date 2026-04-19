@@ -21,18 +21,15 @@ def register(mcp):
     @mcp.tool()
     @graceful
     def evolution_dream() -> str:
-        """Run dream phase — promote working memory to episodic and procedural."""
-        backend = get_backend()
-
-        episodic_ids = backend.commit_working_to_episodic()
-        procedural_ids = backend.commit_working_to_procedural()
-
-        ep_count = len(episodic_ids or [])
-        proc_count = len(procedural_ids or [])
+        """**Deprecated:** CORE-MEMORY-DYNAMICS-1 M1b moved routing to at-ingest
+        via the ConsolidationRouter.  This tool is a no-op kept for caller
+        compatibility."""
+        logger.warning(
+            "evolution_dream is deprecated (CORE-MEMORY-DYNAMICS-1 M1b) — no-op."
+        )
         return (
-            f"Dream phase completed.\n"
-            f"Episodic memories created: {ep_count}\n"
-            f"Procedural memories created: {proc_count}"
+            "Dream phase is deprecated. Routing happens at ingest via the "
+            "ConsolidationRouter (CORE-MEMORY-DYNAMICS-1). Nothing to do."
         )
 
     @mcp.tool()
@@ -42,15 +39,16 @@ def register(mcp):
         backend = get_backend()
 
         try:
-            working_items = backend.search("*", memory_type="working", top_k=100) or []
-            working_count = len(working_items)
+            # CORE-MEMORY-DYNAMICS-1 M1b: "working" memory_type renamed to "pending".
+            pending_items = backend.search("*", memory_type="pending", top_k=100) or []
+            pending_count = len(pending_items)
         except Exception:
-            working_count = 0
+            pending_count = 0
 
-        status = "ready" if working_count >= 1 else "idle"
+        status = "ready" if pending_count >= 1 else "idle"
         return (
             f"Evolution status: {status}\n"
-            f"Working memory items pending: {working_count}"
+            f"Pending memory items (formerly 'working'): {pending_count}"
         )
 
     @mcp.tool()

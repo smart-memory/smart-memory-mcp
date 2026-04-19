@@ -52,7 +52,7 @@ def _mk_row(item_id, content, mtype, **extra):
 
 def test_build_working_context_produces_contract_shape():
     backend = MagicMock()
-    backend.search.return_value = [_mk_row("w1", "hi", "working")]
+    backend.search.return_value = [_mk_row("w1", "hi", "pending")]
 
     resp = memory_tools._build_working_context(
         backend, session_id="s", query="q", k=5, max_tokens=None, strategy=None,
@@ -66,9 +66,9 @@ def test_build_working_context_produces_contract_shape():
 def test_build_working_context_respects_max_tokens():
     backend = MagicMock()
     backend.search.return_value = [
-        _mk_row("w1", "a" * 100, "working"),
-        _mk_row("w2", "b" * 100, "working"),
-        _mk_row("w3", "c" * 100, "working"),
+        _mk_row("w1", "a" * 100, "pending"),
+        _mk_row("w2", "b" * 100, "pending"),
+        _mk_row("w3", "c" * 100, "pending"),
     ]
     # Budget of 30 → ~25 tokens per item; fits one.
     resp = memory_tools._build_working_context(
@@ -80,7 +80,7 @@ def test_build_working_context_respects_max_tokens():
 
 def test_build_working_context_budget_too_small_raises():
     backend = MagicMock()
-    backend.search.return_value = [_mk_row("w1", "a" * 100, "working")]
+    backend.search.return_value = [_mk_row("w1", "a" * 100, "pending")]
     with pytest.raises(ValueError, match="budget_too_small"):
         memory_tools._build_working_context(
             backend, session_id="s", query="q", k=5, max_tokens=1, strategy=None,
@@ -95,7 +95,7 @@ def test_get_working_context_tool_happy_path():
     gwc = tools["get_working_context"]
 
     fake_backend = MagicMock()
-    fake_backend.search.return_value = [_mk_row("w1", "hello", "working")]
+    fake_backend.search.return_value = [_mk_row("w1", "hello", "pending")]
 
     with patch("smartmemory_mcp.tools.memory_tools.get_backend", return_value=fake_backend):
         resp = gwc(session_id="s1", query="hello")
@@ -121,7 +121,7 @@ def test_memory_recall_deprecation_logged_once(caplog):
     recall = tools["memory_recall"]
 
     fake_backend = MagicMock(spec=["search"])  # force non-native path
-    fake_backend.search.return_value = [_mk_row("w1", "hi", "working")]
+    fake_backend.search.return_value = [_mk_row("w1", "hi", "pending")]
 
     with patch("smartmemory_mcp.tools.memory_tools.get_backend", return_value=fake_backend):
         with caplog.at_level(logging.WARNING, logger=memory_tools.logger.name):
@@ -138,7 +138,7 @@ def test_memory_recall_filters_to_working():
 
     fake_backend = MagicMock(spec=["search"])
     fake_backend.search.return_value = [
-        _mk_row("w1", "working turn", "working"),
+        _mk_row("w1", "working turn", "pending"),
         _mk_row("s1", "semantic fact", "semantic"),
         _mk_row("e1", "episodic event", "episodic"),
     ]
@@ -154,7 +154,7 @@ def test_legacy_recall_type_scope_matches_service():
     """Plan-m1a.md allows collapsing to a shared constant if the two repos' scopes are identical.
     We verify here that they match the service's value.  If they diverge, this regression
     test forces the implementer to handle it explicitly per plan-m1a.md §2."""
-    assert memory_tools._LEGACY_RECALL_TYPE_SCOPE == {"working"}
+    assert memory_tools._LEGACY_RECALL_TYPE_SCOPE == {"pending"}
 
 
 def test_top_k_validation():
@@ -191,7 +191,7 @@ def test_build_working_context_exact_fit_budget():
     the item (loop uses `>` for overflow, so `==` passes)."""
     backend = MagicMock()
     # content 40 chars → max(1, 40//4) = 10 tokens
-    backend.search.return_value = [_mk_row("w1", "x" * 40, "working")]
+    backend.search.return_value = [_mk_row("w1", "x" * 40, "pending")]
     resp = memory_tools._build_working_context(
         backend, session_id="s", query="q", k=5, max_tokens=10, strategy=None,
     )
@@ -203,7 +203,7 @@ def test_build_working_context_empty_content_contributes_zero_tokens():
     """Codex coverage: zero-token item (empty content) consumes zero budget per
     standalone's _estimate_tokens contract (short-circuits to 0 on falsy input)."""
     backend = MagicMock()
-    backend.search.return_value = [_mk_row("w1", "", "working"), _mk_row("w2", "y" * 40, "working")]
+    backend.search.return_value = [_mk_row("w1", "", "pending"), _mk_row("w2", "y" * 40, "pending")]
     resp = memory_tools._build_working_context(
         backend, session_id="s", query="q", k=5, max_tokens=10, strategy=None,
     )

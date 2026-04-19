@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 # CORE-MEMORY-DYNAMICS-1 M1a — legacy memory_recall() scope for the standalone MCP.
 # Pre-shim memory_recall filtered to memory_type="working" (memory_tools.py:241).
+# CORE-MEMORY-DYNAMICS-1 M1b renamed "working" → "pending"; the scope follows.
 # Matches the service repo's scope; per plan-m1a.md both repos derive independently.
-_LEGACY_RECALL_TYPE_SCOPE: set = {"working"}
+_LEGACY_RECALL_TYPE_SCOPE: set = {"pending"}
 
 # Module-level one-shot deprecation flag — logs exactly once per process.
 _RECALL_DEPRECATION_WARNED: bool = False
