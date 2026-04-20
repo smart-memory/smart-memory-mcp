@@ -40,7 +40,16 @@ def _build_working_context(
     from ``backend.search`` directly.  Mirrors
     ``SmartMemory.get_working_context`` from core.  Anchors are NOT
     supported in the standalone (no AnchorQueries).
+
+    CORE-MEMORY-DYNAMICS-1 M2a Slice A: activation scoring now reads the
+    nested ``metadata["activation"]`` dict via
+    ``smartmemory.activation.score.compute_activation_score``. Items without
+    activation metadata fall back to the neutral default (0.5) — same shape
+    as core M1a behavior, just routed through the primitive so the score
+    decays once Slice B migration seeds items.
     """
+    from smartmemory.activation.score import compute_activation_score
+
     decision_id = _uuid.uuid4().hex
     fetch_k = max(k * 5, k)
     raw = list(backend.search(query, top_k=fetch_k) or [])
@@ -53,13 +62,14 @@ def _build_working_context(
         item_tokens = _estimate_tokens(content)
         if max_tokens is not None and tokens_used + item_tokens > max_tokens:
             break
+        activation_score = compute_activation_score(row)
         items.append({
             "item_id": row.get("item_id"),
             "content": content,
             "memory_type": row.get("memory_type"),
             "metadata": row.get("metadata") or {},
             "score_breakdown": {
-                "activation": 0.5,
+                "activation": activation_score,
                 "relevance": float(row.get("score") or 0.0),
                 "recency": 1.0,
                 "centrality": 1.0,
