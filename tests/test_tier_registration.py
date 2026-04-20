@@ -102,31 +102,33 @@ FREE_TOOLS = sorted([
     "memory_import",
     "memory_migrate",
     "memory_auto",  # DIST-AGENT-HOOKS-1
+    "memory_feedback",  # SELF-IMPROVE-* feedback surface
+    "get_working_context",  # CORE-MEMORY-DYNAMICS-1 M1a
 ])
 
 
 class TestToolRegistration:
     def test_free_tier_tool_count(self):
-        """FREE tier registers exactly 10 tools."""
+        """FREE tier registers exactly 13 tools."""
         env = _clean_env()
         data = _run_snippet(env)
-        assert data["count"] == 11, f"Expected 11 FREE tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 13, f"Expected 13 FREE tools, got {data['count']}: {data['names']}"
         assert data["names"] == FREE_TOOLS
 
     def test_pro_tier_tool_count(self):
-        """PRO tier registers exactly 47 tools."""
+        """PRO tier registers exactly 52 tools."""
         env = _clean_env(SMARTMEMORY_API_KEY="sk_test_key_123")
         data = _run_snippet(env)
-        assert data["count"] == 48, f"Expected 48 PRO tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 52, f"Expected 52 PRO tools, got {data['count']}: {data['names']}"
         # Verify FREE tools are a subset of PRO tools
         for tool in FREE_TOOLS:
             assert tool in data["names"], f"FREE tool {tool!r} missing from PRO tier"
 
     def test_pro_plus_tier_tool_count(self):
-        """PRO_PLUS tier registers exactly 78 tools."""
+        """PRO_PLUS tier registers exactly 83 tools."""
         env = _clean_env(SMARTMEMORY_API_KEY="sk_test_key_123", SMARTMEMORY_MCP_FULL_TOOLS="true")
         data = _run_snippet(env)
-        assert data["count"] == 79, f"Expected 79 PRO_PLUS tools, got {data['count']}: {data['names']}"
+        assert data["count"] == 83, f"Expected 83 PRO_PLUS tools, got {data['count']}: {data['names']}"
         # Verify FREE tools are a subset of PRO_PLUS tools
         for tool in FREE_TOOLS:
             assert tool in data["names"], f"FREE tool {tool!r} missing from PRO_PLUS tier"
