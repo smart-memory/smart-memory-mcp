@@ -39,16 +39,43 @@ class LocalBackend:
             return None
         return normalize_item(result)
 
-    def update(self, item_id: str, content: str | None = None, metadata: dict | None = None, **kwargs: Any) -> str:
-        """Update an existing memory."""
+    def update(
+        self,
+        item_id: str,
+        content: str | None = None,
+        metadata: dict | None = None,
+        properties: dict | None = None,
+        write_mode: str | None = None,
+        **kwargs: Any,
+    ) -> str:
+        """Update an existing memory via the canonical update_properties path.
+
+        See CORE-CRUD-UPDATE-1 contract: `properties` takes precedence over the
+        content/metadata conveniences; `write_mode` is "merge" (default) or
+        "replace".
+        """
         item = self._mem.get(item_id)
         if item is None:
             return f"Not found: {item_id}"
-        if content is not None:
-            item.content = content
-        if metadata is not None:
-            item.metadata.update(metadata)
-        self._mem.update(item)
+
+        if properties is not None:
+            props = dict(properties)
+        else:
+            props = {}
+            if content is not None:
+                props["content"] = content
+            if metadata is not None:
+                existing_meta = {}
+                if hasattr(item, "metadata") and isinstance(item.metadata, dict):
+                    existing_meta = item.metadata
+                elif isinstance(item, dict):
+                    existing_meta = item.get("metadata") or {}
+                props["metadata"] = {**existing_meta, **metadata}
+
+        if not props:
+            return "At least one of 'content', 'metadata', or 'properties' must be provided"
+
+        self._mem.update_properties(item_id, props, write_mode=write_mode)
         return f"Updated: {item_id}"
 
     def delete(self, item_id: str, **kwargs: Any) -> bool:
@@ -60,7 +87,11 @@ class LocalBackend:
     def search(self, query: str, top_k: int = 5, **kwargs: Any) -> list[MemoryResult]:
         """Semantic search."""
         from smartmemory_app.storage import search
-        return normalize_items(search(query, top_k, **kwargs))
+        results = normalize_items(search(query, top_k, **kwargs))
+        # SELF-IMPROVE-6: track shown IDs for local-mode feedback
+        self._last_search_session_id = f"local:{id(results)}:{top_k}"
+        self._last_shown_ids = [r.get("item_id", "") for r in results if r.get("item_id")]
+        return results
 
     def search_by_metadata(self, metadata_key: str, metadata_value: str, top_k: int = 10, **kwargs: Any) -> list[MemoryResult]:
         """Search by metadata field."""
@@ -215,3 +246,31 @@ class LocalBackend:
     def switch_team(self, team_id: str, **kwargs: Any) -> str:
         """No-op in local mode."""
         return "Local mode — teams not applicable."
+
+    # -- Retrieval feedback (SELF-IMPROVE-6) --
+
+    def submit_feedback(self, search_session_id: str, result_used: list[str], **kwargs: Any) -> dict:
+        """Emit result-selection feedback via core retrieval_tracking (local mode).
+
+        Uses the shown_ids captured from the most recent search() call to provide
+        accurate selection rate data (not just result_used == result_shown).
+        """
+        try:
+            from smartmemory.observability.retrieval_tracking import emit_result_feedback
+
+            # Use shown_ids from the search that produced these results
+            shown_ids = getattr(self, "_last_shown_ids", None) or []
+            if not shown_ids:
+                log.warning("submit_feedback: no prior search() call — shown_ids unknown, skipping")
+                return {"status": "skipped", "reason": "no prior search context"}
+
+            emit_result_feedback(
+                query_hash="",
+                result_used=result_used,
+                result_shown=shown_ids,
+                workspace_id="default",
+                search_session_id=search_session_id,
+            )
+            return {"status": "ok", "search_session_id": search_session_id, "result_used_count": len(result_used)}
+        except Exception as exc:
+            return {"error": str(exc)}

@@ -170,9 +170,13 @@ class RemoteBackend:
         return normalize_item(result)
 
     def update(self, item_id: str, **kwargs: Any) -> dict[str, Any]:
-        """PUT /memory/{item_id}."""
+        """PUT /memory/{item_id}.
+
+        Supports the CORE-CRUD-UPDATE-1 contract: content/metadata/properties/write_mode
+        are forwarded verbatim. memory_type is forwarded for legacy compatibility.
+        """
         body: dict[str, Any] = {}
-        for key in ("content", "memory_type", "metadata"):
+        for key in ("content", "metadata", "properties", "write_mode", "memory_type"):
             if key in kwargs:
                 body[key] = kwargs[key]
         return self._request("PUT", f"/memory/{item_id}", json=body) or {}
@@ -205,7 +209,25 @@ class RemoteBackend:
                 body["max_hops"] = kwargs["max_hops"]
             if "budget_ms" in kwargs:
                 body["budget_ms"] = kwargs["budget_ms"]
-        result = self._request("POST", "/memory/search", json=body)
+        # SELF-IMPROVE-6: capture X-Search-Session-Id header from response
+        self._last_search_session_id: str | None = None
+        try:
+            r = httpx.request(
+                "POST",
+                f"{self._api_url}/memory/search",
+                headers=self._headers(),
+                json=body,
+                timeout=30,
+            )
+            r.raise_for_status()
+            self._last_search_session_id = r.headers.get("x-search-session-id") or r.headers.get("X-Search-Session-Id")
+            result = r.json() if r.status_code != 204 else None
+        except httpx.ConnectError:
+            result = {"error": f"SmartMemory API unreachable at {self._api_url}. Check SMARTMEMORY_API_URL."}
+        except httpx.HTTPStatusError as e:
+            result = {"error": f"API error {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            result = {"error": f"Request failed: {e}"}
         if isinstance(result, dict) and self._fmt_error(result):
             return [result]
         raw = result if isinstance(result, list) else []
@@ -401,3 +423,13 @@ class RemoteBackend:
     def find_shortest_path(self, source_id: str, target_id: str, **kwargs: Any) -> dict[str, Any]:
         """Not available in remote mode."""
         raise NotImplementedError("Not available in remote mode. Use local backend.")
+
+    # --- Retrieval feedback (SELF-IMPROVE-6) -------------------------------------
+
+    def submit_feedback(self, search_session_id: str, result_used: list[str], **kwargs: Any) -> dict[str, Any]:
+        """POST /memory/result-feedback — submit result-selection feedback."""
+        return self._request(
+            "POST",
+            "/memory/result-feedback",
+            json={"search_session_id": search_session_id, "result_used": result_used},
+        )

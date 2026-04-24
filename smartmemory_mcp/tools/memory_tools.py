@@ -439,10 +439,27 @@ def register_pro(mcp):
 
     @mcp.tool()
     @graceful
-    def memory_update(item_id: str, content: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Update a memory item's content or metadata."""
+    def memory_update(
+        item_id: str,
+        content: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        properties: Optional[Dict[str, Any]] = None,
+        write_mode: Optional[str] = None,
+    ) -> str:
+        """Update a memory item's properties (CORE-CRUD-UPDATE-1).
+
+        - ``content``/``metadata``: convenience — folded into the properties dict.
+        - ``properties``: advanced — direct node-property update. Takes precedence.
+        - ``write_mode``: "merge" (default) or "replace".
+        """
         backend = get_backend()
-        result = backend.update(item_id, content=content, metadata=metadata)
+        result = backend.update(
+            item_id,
+            content=content,
+            metadata=metadata,
+            properties=properties,
+            write_mode=write_mode,
+        )
         return str(result) if result else f"Updated: {item_id}"
 
     @mcp.tool()
