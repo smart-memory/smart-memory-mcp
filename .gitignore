@@ -7,3 +7,4 @@ __pycache__/
 .secrets
 .act.secrets
 .idea/
+.DS_Store
