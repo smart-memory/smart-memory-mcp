@@ -162,3 +162,9 @@ class MemoryBackend(Protocol):
     def find_shortest_path(self, source_id: str, target_id: str, **kwargs: Any) -> dict[str, Any]:
         """Find the shortest path between two nodes in the graph."""
         ...
+
+    # --- Retrieval feedback (SELF-IMPROVE-6) -------------------------------------
+
+    def submit_feedback(self, search_session_id: str, result_used: list[str], **kwargs: Any) -> dict[str, Any]:
+        """Submit result-selection feedback for a completed search session."""
+        ...

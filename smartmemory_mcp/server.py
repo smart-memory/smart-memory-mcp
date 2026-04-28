@@ -107,6 +107,7 @@ def _register_tools():
     from smartmemory_mcp.tools import memory_tools, portability_tools, lifecycle_tools
 
     memory_tools.register_free(mcp)
+    memory_tools.register_feedback(mcp)
     portability_tools.register(mcp)
     lifecycle_tools.register(mcp)
 
