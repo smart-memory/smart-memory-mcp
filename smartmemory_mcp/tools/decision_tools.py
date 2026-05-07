@@ -21,8 +21,15 @@ def register(mcp):
         domain: Optional[str] = None,
         tags: Optional[List[str]] = None,
         source_trace_id: Optional[str] = None,
+        rejected_alternatives: Optional[List[str]] = None,
+        rationale: Optional[str] = None,
+        constraints: Optional[List[str]] = None,
     ) -> str:
-        """Create a new decision with provenance tracking."""
+        """Create a new decision with provenance tracking.
+
+        CORE-EXPERTISE-1 Phase 1: rejected_alternatives, rationale, constraints
+        capture the "why" structure that makes decisions usable expertise.
+        """
         try:
             from smartmemory.decisions.manager import DecisionManager
 
@@ -36,13 +43,23 @@ def register(mcp):
                 evidence_ids=evidence_ids or [],
                 domain=domain,
                 tags=tags or [],
+                rejected_alternatives=rejected_alternatives or [],
+                rationale=rationale,
+                constraints=constraints or [],
             )
 
-            return (
-                f"Decision created: {decision.decision_id}\n"
-                f"Type: {decision.decision_type}\n"
-                f"Confidence: {decision.confidence}"
-            )
+            lines = [
+                f"Decision created: {decision.decision_id}",
+                f"Type: {decision.decision_type}",
+                f"Confidence: {decision.confidence}",
+            ]
+            if decision.rejected_alternatives:
+                lines.append(f"Rejected alternatives: {decision.rejected_alternatives}")
+            if decision.rationale:
+                lines.append(f"Rationale: {decision.rationale}")
+            if decision.constraints:
+                lines.append(f"Constraints: {decision.constraints}")
+            return "\n".join(lines)
         except Exception as e:
             logger.error(f"Failed to create decision: {e}", exc_info=True)
             raise
